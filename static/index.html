@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧚 玄灵AI 控制台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; color: #fff; overflow: hidden; }
+        
+        .header { background: rgba(0,0,0,0.4); padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(102, 126, 234, 0.3); backdrop-filter: blur(10px); position: fixed; top: 0; left: 0; right: 0; z-index: 100; }
+        .logo { font-size: 24px; font-weight: bold; background: linear-gradient(90deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .header-right { display: flex; align-items: center; gap: 20px; }
+        .status { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #a0aec0; }
+        .status-dot { width: 8px; height: 8px; background: #4ade80; border-radius: 50%; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        .container { display: flex; height: 100vh; padding-top: 60px; }
+        
+        .sidebar { width: 200px; background: rgba(0,0,0,0.3); padding: 15px 0; border-right: 1px solid rgba(102, 126, 234, 0.2); }
+        .nav-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.3s; color: #a0aec0; font-size: 14px; }
+        .nav-item:hover { background: rgba(102, 126, 234, 0.1); color: #fff; }
+        .nav-item.active { background: linear-gradient(90deg, rgba(102, 126, 234, 0.3), transparent); color: #667eea; border-left: 3px solid #667eea; }
+        
+        .main { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
+        
+        .panel { display: none; height: 100%; }
+        .panel.active { display: flex; flex-direction: column; }
+        
+        .panel-title { font-size: 20px; margin-bottom: 15px; color: #e2e8f0; }
+        
+        /* 对话界面 */
+        .chat-container { flex: 1; display: flex; flex-direction: column; background: rgba(0,0,0,0.3); border-radius: 16px; overflow: hidden; border: 1px solid rgba(102, 126, 234, 0.2); }
+        
+        .chat-header { padding: 15px 20px; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(102, 126, 234, 0.2); display: flex; justify-content: space-between; align-items: center; }
+        .chat-title { font-weight: bold; color: #e2e8f0; }
+        .chat-actions { display: flex; gap: 10px; }
+        .chat-action { padding: 6px 12px; background: rgba(102, 126, 234, 0.2); border: none; border-radius: 6px; color: #a0aec0; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+        .chat-action:hover { background: rgba(102, 126, 234, 0.4); color: #fff; }
+        
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; }
+        .chat-messages::-webkit-scrollbar { width: 6px; }
+        .chat-messages::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        .chat-messages::-webkit-scrollbar-thumb { background: rgba(102, 126, 234, 0.5); border-radius: 3px; }
+        
+        .message { margin-bottom: 15px; max-width: 85%; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .message.user { margin-left: auto; }
+        .message-content { padding: 12px 18px; border-radius: 18px; line-height: 1.6; font-size: 14px; word-wrap: break-word; }
+        .message.ai .message-content { background: rgba(102, 126, 234, 0.2); border-bottom-left-radius: 4px; }
+        .message.user .message-content { background: linear-gradient(135deg, #667eea, #764ba2); border-bottom-right-radius: 4px; }
+        .message-time { font-size: 11px; color: #666; margin-top: 4px; }
+        
+        .chat-input { padding: 15px 20px; background: rgba(0,0,0,0.4); display: flex; gap: 12px; border-top: 1px solid rgba(102, 126, 234, 0.2); }
+        .chat-input input { flex: 1; padding: 12px 18px; border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 25px; background: rgba(0,0,0,0.3); color: #fff; font-size: 14px; outline: none; transition: border 0.3s; }
+        .chat-input input:focus { border-color: #667eea; }
+        .chat-input input::placeholder { color: #666; }
+        .chat-input button { padding: 12px 25px; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 25px; color: #fff; font-weight: bold; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .chat-input button:hover { transform: scale(1.05); box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4); }
+        .chat-input button:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* 历史记录侧边栏 */
+        .history-panel { width: 280px; background: rgba(0,0,0,0.4); border-left: 1px solid rgba(102, 126, 234, 0.2); display: none; flex-direction: column; }
+        .history-panel.show { display: flex; }
+        .history-header { padding: 15px; border-bottom: 1px solid rgba(102, 126, 234, 0.2); font-weight: bold; }
+        .history-list { flex: 1; overflow-y: auto; padding: 10px; }
+        .history-item { padding: 12px; background: rgba(0,0,0,0.2); border-radius: 8px; margin-bottom: 8px; cursor: pointer; transition: all 0.2s; }
+        .history-item:hover { background: rgba(102, 126, 234, 0.2); }
+        .history-item-title { font-size: 13px; color: #e2e8f0; margin-bottom: 4px; }
+        .history-item-time { font-size: 11px; color: #666; }
+        
+        /* 项目卡片 */
+        .projects-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 15px; overflow-y: auto; padding-right: 5px; }
+        .projects-grid::-webkit-scrollbar { width: 6px; }
+        .projects-grid::-webkit-scrollbar-thumb { background: rgba(102, 126, 234, 0.5); border-radius: 3px; }
+        
+        .project-card { background: rgba(0,0,0,0.3); border-radius: 12px; padding: 20px; border: 1px solid rgba(102, 126, 234, 0.2); transition: all 0.3s; }
+        .project-card:hover { border-color: #667eea; transform: translateY(-3px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.2); }
+        .project-icon { font-size: 36px; margin-bottom: 12px; }
+        .project-name { font-size: 16px; font-weight: bold; margin-bottom: 8px; }
+        .project-desc { color: #a0aec0; font-size: 13px; line-height: 1.5; }
+        .project-status { margin-top: 12px; padding: 4px 12px; background: rgba(74, 222, 128, 0.2); color: #4ade80; border-radius: 15px; font-size: 11px; display: inline-block; }
+        
+        .add-card { background: rgba(102, 126, 234, 0.1); border: 2px dashed rgba(102, 126, 234, 0.4); border-radius: 12px; padding: 30px; text-align: center; cursor: pointer; transition: all 0.3s; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 150px; }
+        .add-card:hover { border-color: #667eea; background: rgba(102, 126, 234, 0.2); }
+        .add-card span { font-size: 36px; color: #667eea; }
+        .add-card p { color: #a0aec0; margin-top: 10px; }
+        
+        /* 记忆 */
+        .memory-list { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-right: 5px; }
+        .memory-list::-webkit-scrollbar { width: 6px; }
+        .memory-list::-webkit-scrollbar-thumb { background: rgba(102, 126, 234, 0.5); border-radius: 3px; }
+        
+        .memory-item { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 18px; border-left: 3px solid #764ba2; }
+        .memory-title { font-weight: bold; color: #e2e8f0; margin-bottom: 6px; font-size: 14px; }
+        .memory-content { color: #a0aec0; font-size: 13px; line-height: 1.5; }
+        .memory-tags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+        .memory-tag { padding: 3px 10px; background: rgba(102, 126, 234, 0.2); border-radius: 12px; font-size: 11px; color: #667eea; }
+        
+        /* 技能 */
+        .skills-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
+        .skill-card { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 18px; border: 1px solid rgba(102, 126, 234, 0.2); cursor: pointer; transition: all 0.3s; }
+        .skill-card:hover { border-color: #667eea; transform: translateY(-3px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3); }
+        .skill-name { font-weight: bold; margin-bottom: 6px; font-size: 14px; }
+        .skill-desc { color: #a0aec0; font-size: 12px; }
+        
+        /* 技能详情弹窗 */
+        .skill-detail { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 300; justify-content: center; align-items: center; }
+        .skill-detail.show { display: flex; }
+        .skill-detail-content { background: linear-gradient(135deg, #1a1a2e, #16213e); border-radius: 16px; padding: 30px; width: 450px; border: 1px solid rgba(102, 126, 234, 0.4); }
+        .skill-detail-title { font-size: 22px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .skill-detail-desc { color: #a0aec0; line-height: 1.8; margin-bottom: 20px; }
+        .skill-close { float: right; background: none; border: none; color: #666; font-size: 24px; cursor: pointer; }
+        .skill-close:hover { color: #fff; }
+        
+        /* 设置 */
+        .settings-form { max-width: 500px; }
+        .form-group { margin-bottom: 20px; }
+        .form-label { display: block; margin-bottom: 8px; color: #a0aec0; font-size: 13px; }
+        .form-input { width: 100%; padding: 10px 14px; border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 8px; background: rgba(0,0,0,0.3); color: #fff; font-size: 13px; }
+        .form-input:focus { outline: none; border-color: #667eea; }
+        .save-btn { padding: 10px 25px; background: linear-gradient(135deg, #667eea, #764ba2); border: none; border-radius: 8px; color: #fff; font-weight: bold; cursor: pointer; }
+        
+        /* 模态框 */
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 200; justify-content: center; align-items: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: #1a1a2e; border-radius: 16px; padding: 25px; width: 400px; border: 1px solid rgba(102, 126, 234, 0.3); }
+        .modal-title { font-size: 18px; margin-bottom: 20px; }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+        .modal-btn { padding: 8px 20px; border-radius: 8px; cursor: pointer; border: none; }
+        .modal-btn.cancel { background: rgba(255,255,255,0.1); color: #a0aec0; }
+        .modal-btn.confirm { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
+        
+        .loading { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">🧚 玄灵AI</div>
+        <div class="header-right">
+            <div class="status"><div class="status-dot"></div><span>在线</span></div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="sidebar">
+            <div class="nav-item active" data-panel="chat"><span>💬</span> AI 对话</div>
+            <div class="nav-item" data-panel="projects"><span>📁</span> 项目管理</div>
+            <div class="nav-item" data-panel="memory"><span>🧠</span> 记忆系统</div>
+            <div class="nav-item" data-panel="skills"><span>🛠️</span> 技能商店</div>
+            <div class="nav-item" data-panel="settings"><span>⚙️</span> 系统设置</div>
+            <div class="nav-item" data-panel="local"><span>💻</span> 本地运行</div>
+        </div>
+        
+        <div class="main">
+            <!-- 对话面板 -->
+            <div class="panel active" id="chat">
+                <div class="chat-container">
+                    <div class="chat-header">
+                        <span class="chat-title">💬 与玄灵AI对话</span>
+                        <div class="chat-actions">
+                            <button class="chat-action" onclick="toggleHistory()">📜 历史</button>
+                            <button class="chat-action" onclick="clearChat()">🗑️ 清空</button>
+                        </div>
+                    </div>
+                    <div class="chat-messages" id="messages">
+                        <div class="message ai">
+                            <div class="message-content">
+                                你好！我是<strong>玄灵AI</strong> 🧚<br><br>
+                                我可以帮助你：<br>
+                                • 智能对话和问答<br>
+                                • 管理项目<br>
+                                • 记忆重要信息<br>
+                                • 执行各种任务<br><br>
+                                有什么可以帮你的吗？
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chat-input">
+                        <input type="text" id="userInput" placeholder="输入消息..." onkeypress="handleKeyPress(event)">
+                        <button onclick="sendMessage()" id="sendBtn">发送</button>
+                    </div>
+                </div>
+                <div class="history-panel" id="historyPanel">
+                    <div class="history-header">对话历史</div>
+                    <div class="history-list" id="historyList"></div>
+                </div>
+            </div>
+            
+            <!-- 项目面板 -->
+            <div class="panel" id="projects">
+                <h2 class="panel-title">📁 项目管理</h2>
+                <div class="projects-grid" id="projectsGrid"></div>
+            </div>
+            
+            <!-- 记忆面板 -->
+            <div class="panel" id="memory">
+                <h2 class="panel-title">🧠 记忆系统</h2>
+                <div class="memory-list" id="memoryList"></div>
+            </div>
+            
+            <!-- 技能面板 -->
+            <div class="panel" id="skills">
+                <h2 class="panel-title">🛠️ 技能商店</h2>
+                <div class="skills-grid">
+                    <div class="skill-card"><div class="skill-name">💬 对话技能</div><div class="skill-desc">智能对话和问答能力</div></div>
+                    <div class="skill-card"><div class="skill-name">🧠 记忆技能</div><div class="skill-desc">长期和短期记忆管理</div></div>
+                    <div class="skill-card"><div class="skill-name">🛠️ 工具技能</div><div class="skill-desc">调用外部工具和能力</div></div>
+                    <div class="skill-card"><div class="skill-name">🔌 插件技能</div><div class="skill-desc">飞书、Telegram集成</div></div>
+                    <div class="skill-card"><div class="skill-name">📝 写作技能</div><div class="skill-desc">文章、文案创作</div></div>
+                    <div class="skill-card"><div class="skill-name">💻 编程技能</div><div class="skill-desc">代码编写和调试</div></div>
+                </div>
+            </div>
+            
+            <!-- 设置面板 -->
+            <div class="panel" id="settings">
+                <h2 class="panel-title">⚙️ 系统设置</h2>
+                <div class="settings-form">
+                    <div class="form-group"><label class="form-label">API 地址</label><input type="text" class="form-input" id="apiUrl" value="https://code.coolyeah.net/v1"></div>
+                    <div class="form-group"><label class="form-label">API Key</label><input type="password" class="form-input" id="apiKey" value="sk-xxxxx...xxxxx"></div>
+                    <div class="form-group"><label class="form-label">模型名称</label><input type="text" class="form-input" id="modelName" value="MiniMax-M2.5"></div>
+                    <button class="save-btn" onclick="saveSettings()">保存设置</button>
+                </div>
+            </div>
+            
+            <!-- 本地运行面板 -->
+            <div class="panel" id="local">
+                <h2 class="panel-title">💻 本地运行指南</h2>
+                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:600px;">
+                    <h3 style="color:#667eea;margin-bottom:15px;">快速开始</h3>
+                    <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.6;">
+# 1. 克隆项目
+git clone https://github.com/DZW210191/xuanling-ai.git
+cd xuanling-ai
+
+# 2. 安装依赖
+pip install -r requirements.txt
+
+# 3. 配置环境变量
+export API_KEY="你的API_KEY"
+export API_BASE_URL="https://code.coolyeah.net/v1"
+
+# 4. 运行
+python src/main.py</pre>
+                    
+                    <h3 style="color:#667eea;margin:20px 0 15px;">或使用 Docker</h3>
+                    <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow-x:auto;font-size:13px;">
+# 构建并运行
+docker build -t xuanling-ai .
+docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
+                    
+                    <h3 style="color:#667eea;margin:20px 0 15px;">访问地址</h3>
+                    <p style="color:#a0aec0;">启动后访问: <span style="color:#4ade80;">http://localhost:8000</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 添加项目模态框 -->
+    <div class="modal" id="addProjectModal">
+        <div class="modal-content">
+            <div class="modal-title">添加新项目</div>
+            <div class="form-group">
+                <label class="form-label">项目名称</label>
+                <input type="text" class="form-input" id="newProjectName" placeholder="输入项目名称">
+            </div>
+            <div class="form-group">
+                <label class="form-label">项目描述</label>
+                <input type="text" class="form-input" id="newProjectDesc" placeholder="输入项目描述">
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" onclick="closeModal()">取消</button>
+                <button class="modal-btn confirm" onclick="confirmAddProject()">添加</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 技能详情弹窗 -->
+    <div class="skill-detail" id="skillDetail">
+        <div class="skill-detail-content">
+            <button class="skill-close" onclick="closeSkillDetail()">&times;</button>
+            <div class="skill-detail-title" id="skillDetailTitle"></div>
+            <div class="skill-detail-desc" id="skillDetailDesc"></div>
+        </div>
+    </div>
+    
+    <!-- 项目详情弹窗 -->
+    <div class="modal" id="projectDetailModal">
+        <div class="modal-content" style="width:450px;">
+            <div class="modal-title" id="projectDetailTitle"></div>
+            <div class="form-group">
+                <label class="form-label">项目描述</label>
+                <textarea class="form-input" id="projectDetailDesc" rows="3" style="resize:vertical;"></textarea>
+            </div>
+            <div class="form-group">
+                <label class="form-label">状态</label>
+                <select class="form-input" id="projectDetailStatus">
+                    <option value="开发中">开发中</option>
+                    <option value="已完成">已完成</option>
+                    <option value="维护中">维护中</option>
+                    <option value="已暂停">已暂停</option>
+                </select>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" style="background:#ef4444;" onclick="deleteProject()">删除</button>
+                <button class="modal-btn cancel" onclick="closeProjectDetail()">取消</button>
+                <button class="modal-btn confirm" onclick="saveProject()">保存</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://106.55.107.63:8000';
+        let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+        
+        // 检查API连接状态
+        async function checkApiStatus() {
+            try {
+                const resp = await fetch(API_BASE + '/health', { method: 'GET', signal: AbortSignal.timeout(3000) });
+                return resp.ok;
+            } catch { return false; }
+        }
+        
+        // 初始化时检查连接
+        checkApiStatus().then(ok => {
+            const statusDot = document.querySelector('.status-dot');
+            const statusText = document.querySelector('.status span');
+            if (ok) {
+                statusDot.style.background = '#4ade80';
+                statusText.textContent = '在线';
+            } else {
+                statusDot.style.background = '#ef4444';
+                statusText.textContent = '离线';
+            }
+        });
+        
+        // 导航 - 使用事件委托确保可靠
+        document.addEventListener('DOMContentLoaded', function() {
+            const navItems = document.querySelectorAll('.nav-item');
+            console.log('导航项数量:', navItems.length);
+            
+            navItems.forEach(item => {
+                item.addEventListener('click', function(e) {
+                    console.log('点击了:', this.dataset.panel);
+                    
+                    // 移除所有active
+                    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                    
+                    // 添加active
+                    this.classList.add('active');
+                    const panelId = this.dataset.panel;
+                    const panel = document.getElementById(panelId);
+                    if (panel) {
+                        panel.classList.add('active');
+                        console.log('切换到面板:', panelId);
+                    } else {
+                        console.error('未找到面板:', panelId);
+                    }
+                    
+                    // 加载数据
+                    if (panelId === 'projects') loadProjects();
+                    if (panelId === 'memory') loadMemories();
+                    if (panelId === 'settings') loadSettings();
+                });
+            });
+        });
+        
+        // 发送消息
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const btn = document.getElementById('sendBtn');
+            const message = input.value.trim();
+            if (!message) return;
+            
+            addMessage(message, 'user', new Date().toLocaleTimeString());
+            input.value = '';
+            btn.disabled = true;
+            
+            const loadingId = addMessage('...', 'ai', '');
+            
+            try {
+                const resp = await fetch(API_BASE + '/chat/json', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message})
+                });
+                const data = await resp.json();
+                document.getElementById(loadingId)?.remove();
+                addMessage(data.message, 'ai', new Date().toLocaleTimeString());
+                
+                // 保存到历史
+                chatHistory.push({user: message, ai: data.message, time: new Date().toISOString()});
+                localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            } catch (e) {
+                document.getElementById(loadingId)?.remove();
+                addMessage('抱歉，出了点问题: ' + e.message, 'ai', new Date().toLocaleTimeString());
+            }
+            
+            btn.disabled = false;
+            input.focus();
+        }
+        
+        function addMessage(content, type, time) {
+            const div = document.createElement('div');
+            div.className = 'message ' + type;
+            div.innerHTML = '<div class="message-content">' + content.replace(/\n/g, '<br>') + '</div>' + (time ? '<div class="message-time">' + time + '</div>' : '');
+            const msgs = document.getElementById('messages');
+            msgs.appendChild(div);
+            msgs.scrollTop = msgs.scrollHeight;
+        }
+        
+        function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
+        
+        // 清空对话
+        function clearChat() {
+            document.getElementById('messages').innerHTML = '<div class="message ai"><div class="message-content">对话已清空</div></div>';
+        }
+        
+        // 切换历史面板
+        function toggleHistory() {
+            document.getElementById('historyPanel').classList.toggle('show');
+            renderHistory();
+        }
+        
+        function renderHistory() {
+            const list = document.getElementById('historyList');
+            if (chatHistory.length === 0) {
+                list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">暂无历史记录</div>';
+                return;
+            }
+            list.innerHTML = chatHistory.slice(-10).reverse().map((h, i) => '<div class="history-item" onclick="loadHistory(' + (chatHistory.length - 1 - i) + ')"><div class="history-item-title">' + h.user.substring(0, 30) + '</div><div class="history-item-time">' + new Date(h.time).toLocaleString() + '</div></div>').join('');
+        }
+        
+        function loadHistory(index) {
+            const h = chatHistory[index];
+            document.getElementById('messages').innerHTML = '<div class="message user"><div class="message-content">' + h.user.replace(/\n/g, '<br>') + '</div></div><div class="message ai"><div class="message-content">' + h.ai.replace(/\n/g, '<br>') + '</div></div>';
+            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        }
+        
+        // 项目
+        let allProjects = [];
+        
+        async function loadProjects() {
+            try {
+                const resp = await fetch(API_BASE + '/projects');
+                const data = await resp.json();
+                allProjects = data.projects || [];
+                const grid = document.getElementById('projectsGrid');
+                grid.innerHTML = allProjects.map((p, idx) => '<div class="project-card" onclick="showProjectDetail(' + idx + ')"><div class="project-icon">' + (p.icon || '📁') + '</div><div class="project-name">' + p.name + '</div><div class="project-desc">' + (p.description || '暂无描述') + '</div><div class="project-status">' + (p.status || '开发中') + '</div></div>').join('') + '<div class="add-card" onclick="showModal()"><span>+</span><p>添加项目</p></div>';
+            } catch (e) { 
+                console.error(e); 
+                document.getElementById('projectsGrid').innerHTML = '<div style="color:#ef4444;padding:20px;">无法加载项目，请检查后端服务</div><div class="add-card" onclick="showModal()"><span>+</span><p>添加项目</p></div>';
+            }
+        }
+        
+        function showProjectDetail(idx) {
+            const p = allProjects[idx];
+            if (!p) return;
+            currentProjectId = p.id;
+            document.getElementById('projectDetailTitle').textContent = p.name;
+            document.getElementById('projectDetailDesc').value = p.description || '';
+            document.getElementById('projectDetailStatus').value = p.status || '开发中';
+            document.getElementById('projectDetailModal').classList.add('show');
+        }
+        
+        function closeProjectDetail() {
+            document.getElementById('projectDetailModal').classList.remove('show');
+            currentProjectId = null;
+        }
+        
+        async function saveProject() {
+            if (!currentProjectId) return;
+            const desc = document.getElementById('projectDetailDesc').value;
+            const status = document.getElementById('projectDetailStatus').value;
+            try {
+                await fetch(API_BASE + '/projects/' + currentProjectId, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({description: desc, status: status})
+                });
+                closeProjectDetail();
+                loadProjects();
+            } catch (e) { alert('保存失败: ' + e.message); }
+        }
+        
+        async function deleteProject() {
+            if (!currentProjectId) return;
+            if (!confirm('确定要删除这个项目吗？')) return;
+            try {
+                await fetch(API_BASE + '/projects/' + currentProjectId, { method: 'DELETE' });
+                closeProjectDetail();
+                loadProjects();
+            } catch (e) { alert('删除失败: ' + e.message); }
+        }
+        
+        function showModal() { document.getElementById('addProjectModal').classList.add('show'); }
+        function closeModal() { document.getElementById('addProjectModal').classList.remove('show'); }
+        
+        async function confirmAddProject() {
+            const name = document.getElementById('newProjectName').value;
+            const desc = document.getElementById('newProjectDesc').value;
+            if (!name) return;
+            
+            try {
+                await fetch(API_BASE + '/projects/json', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, description: desc})
+                });
+                closeModal();
+                loadProjects();
+                document.getElementById('newProjectName').value = '';
+                document.getElementById('newProjectDesc').value = '';
+            } catch (e) { alert('添加失败: ' + e.message); }
+        }
+        
+        // 记忆
+        async function loadMemories() {
+            try {
+                const resp = await fetch(API_BASE + '/memory');
+                const data = await resp.json();
+                const list = document.getElementById('memoryList');
+                list.innerHTML = data.memories.map(m => '<div class="memory-item" onclick="editMemory(\'' + (m.id || '') + '\')"><div class="memory-title">' + (m.title || m.content?.split('\n')[0] || '无标题') + '</div><div class="memory-content">' + (m.content?.split('\n')[1] || m.content || '') + '</div><div class="memory-tags">' + ((m.tags || []).map(t => '<span class="memory-tag">' + t + '</span>').join('')) + '</div></div>').join('') || '<div style="color:#666;padding:20px;">暂无记忆 <br><br><button onclick="showAddMemory()" style="background:rgba(102,126,234,0.3);border:none;color:#667eea;padding:8px 16px;border-radius:6px;cursor:pointer;">+ 添加记忆</button></div>';
+            } catch (e) { 
+                console.error(e); 
+                document.getElementById('memoryList').innerHTML = '<div style="color:#ef4444;padding:20px;">无法加载记忆，请检查后端服务</div>';
+            }
+        }
+        
+        function showAddMemory() {
+            const title = prompt('记忆标题:');
+            if (!title) return;
+            const content = prompt('记忆内容:');
+            const tags = prompt('标签 (逗号分隔):');
+            
+            fetch(API_BASE + '/memory/json', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({title, content: content || '', tags: tags || ''})
+            }).then(() => loadMemories()).catch(e => alert('添加失败: ' + e.message));
+        }
+        
+        function editMemory(id) {
+            if (!id) return;
+            if (!confirm('确定要删除这条记忆吗？')) return;
+            // 暂时用简单方式，实际应该调用删除API
+            fetch(API_BASE + '/memory/' + id, { method: 'DELETE' })
+                .then(() => loadMemories())
+                .catch(e => alert('删除失败: ' + e.message));
+        }
+        
+        function saveSettings() { 
+            const apiUrl = document.getElementById('apiUrl').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const modelName = document.getElementById('modelName').value;
+            
+            // 保存到本地
+            localStorage.setItem('xuanling_settings', JSON.stringify({apiUrl, apiKey, modelName}));
+            
+            // 发送到后端保存
+            fetch(API_BASE + '/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    api_url: apiUrl,
+                    api_key: apiKey,
+                    model: modelName
+                })
+            }).then(r => r.json()).then(data => {
+                if (data.status === 'ok') {
+                    alert('✅ 设置已保存并生效！');
+                } else {
+                    alert('⚠️ 本地保存成功，但后端更新失败: ' + (data.message || ''));
+                }
+            }).catch(e => {
+                alert('⚠️ 本地保存成功，但后端连接失败: ' + e.message);
+            });
+        }
+        
+        // 加载后端配置
+        async function loadSettings() {
+            try {
+                const resp = await fetch(API_BASE + '/config');
+                const data = await resp.json();
+                if (data.api_url) document.getElementById('apiUrl').value = data.api_url;
+                if (data.model) document.getElementById('modelName').value = data.model;
+                // API Key 只显示掩码
+                if (data.api_key && data.api_key !== '...') {
+                    // 保持本地输入不变
+                }
+            } catch (e) { console.error('加载配置失败:', e); }
+        }
+        
+        // 技能数据
+        const skillsData = {
+            '💬 对话技能': { desc: '支持多轮对话、上下文理解、智能回复。可以进行日常问答、知识查询、情感交流等。', features: ['多轮对话', '上下文记忆', '智能问答', '情感理解'] },
+            '🧠 记忆技能': { desc: '长期记忆存储重要信息，短期记忆管理会话上下文。支持关键词搜索和记忆关联。', features: ['长期记忆', '短期记忆', '记忆搜索', '关联分析'] },
+            '🛠️ 工具技能': { desc: '调用外部工具执行各种任务，如搜索信息、发送消息、操作文件等。', features: ['搜索工具', '文件操作', 'API调用', '任务执行'] },
+            '🔌 插件技能': { desc: '集成多种通讯平台，支持飞书、Telegram、微信等消息收发。', features: ['飞书集成', 'Telegram', '消息收发', '群组管理'] },
+            '📝 写作技能': { desc: '专业的文案创作能力，支持文章、剧本、广告文案等多种文体。', features: ['文章写作', '文案创作', '剧本编写', '翻译校对'] },
+            '💻 编程技能': { desc: '代码编写、调试、优化。支持Python、JavaScript、Go等多种语言。', features: ['代码编写', 'Bug调试', '代码优化', '技术咨询'] }
+        };
+        
+        // 初始化技能卡片点击
+        document.querySelectorAll('.skill-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const name = card.querySelector('.skill-name').textContent;
+                const data = skillsData[name];
+                if (data) {
+                    document.getElementById('skillDetailTitle').innerHTML = name + '<br><small style="color:#667eea;font-weight:normal;">' + data.features.join(' • ') + '</small>';
+                    document.getElementById('skillDetailDesc').textContent = data.desc;
+                    document.getElementById('skillDetail').classList.add('show');
+                }
+            });
+        });
+        
+        function closeSkillDetail() {
+            document.getElementById('skillDetail').classList.remove('show');
+        }
+        
+        // 项目点击处理
+        let currentProjectId = null;
+        
+        // 加载设置
+        const savedSettings = JSON.parse(localStorage.getItem('xuanling_settings') || '{}');
+        if (savedSettings.apiUrl) document.getElementById('apiUrl').value = savedSettings.apiUrl;
+        if (savedSettings.apiKey) document.getElementById('apiKey').value = savedSettings.apiKey;
+        if (savedSettings.modelName) document.getElementById('modelName').value = savedSettings.modelName;
+        
+        // 初始化 - 立即执行
+        loadProjects(); loadMemories();
+    </script>
+</body>
+</html>

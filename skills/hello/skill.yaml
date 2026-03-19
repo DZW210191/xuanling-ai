@@ -1,0 +1,6 @@
+name: hello
+description: 你好技能 - 打招呼和基本对话
+version: 1.0.0
+tools:
+  - greet
+  - goodbye

@@ -1,0 +1,17 @@
+# 敏感文件 - 不推送到 GitHub
+.env
+.env.local
+*.db
+*.db-journal
+__pycache__/
+*.pyc
+*.pyo
+*.log
+.DS_Store
+config.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

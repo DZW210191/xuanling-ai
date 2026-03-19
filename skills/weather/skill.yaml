@@ -1,0 +1,9 @@
+name: weather
+description: 查询天气信息
+version: 1.0.0
+triggers:
+  - 天气
+  - 温度
+  - 多少度
+actions:
+  - query: 查询指定城市天气
