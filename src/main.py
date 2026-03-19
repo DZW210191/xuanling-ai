@@ -238,26 +238,38 @@ async def get_projects():
 
 @app.post("/projects")
 async def create_project(name: str = "", description: str = "", icon: str = "📁"):
-    """创建项目"""
+    """创建项目 - 同时创建数据库记录和磁盘文件夹"""
     if not name:
         return {"status": "error", "message": "name is required"}
     if xuanling_app:
+        # 1. 创建数据库记录
         project_id = await xuanling_app.db.create_project(name, description, icon)
-        return {"status": "ok", "id": project_id}
+        
+        # 2. 创建磁盘文件夹
+        from src.projects import project_manager
+        folder_result = project_manager.create_project(name, description)
+        
+        return {"status": "ok", "id": project_id, "folder": folder_result}
     return {"status": "error"}
 
 
 @app.post("/projects/json")
 async def create_project_json(body: dict):
-    """创建项目 (JSON)"""
+    """创建项目 (JSON) - 同时创建数据库记录和磁盘文件夹"""
     name = body.get("name", "")
     description = body.get("description", "")
     icon = body.get("icon", "📁")
     if not name:
         return {"status": "error", "message": "name is required"}
     if xuanling_app:
+        # 1. 创建数据库记录
         project_id = await xuanling_app.db.create_project(name, description, icon)
-        return {"status": "ok", "id": project_id}
+        
+        # 2. 创建磁盘文件夹
+        from src.projects import project_manager
+        folder_result = project_manager.create_project(name, description)
+        
+        return {"status": "ok", "id": project_id, "folder": folder_result}
     return {"status": "error"}
 
 
