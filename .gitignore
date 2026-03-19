@@ -10,6 +10,11 @@ __pycache__/
 .DS_Store
 config.yaml
 
+# 项目文件夹 - 本地测试用
+projects/
+src/projects/
+xuanling-ai.bundle
+
 # IDE
 .idea/
 .vscode/
