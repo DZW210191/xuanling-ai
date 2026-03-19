@@ -136,6 +136,20 @@ class Agent:
         # 分析消息，判断是否需要执行工具
         response = await self._handle_with_tools(message.content)
         
+        # 检查是否需要保存到长期记忆
+        # 如果用户明确要求"记住"或对话中包含重要信息
+        content = message.content.lower()
+        important_keywords = ['记住', '不要忘记', '重要', '记住这个', '记得', 'always', 'remember']
+        
+        if any(kw in content for kw in important_keywords):
+            # 保存到长期记忆
+            title = message.content[:30] + "..."
+            await self.memory.add_memory(
+                title=title,
+                content=f"用户: {message.content}\n助手: {response}",
+                tags=["对话记忆", "重要"]
+            )
+        
         return response
     
     async def _handle_with_tools(self, user_message: str) -> str:

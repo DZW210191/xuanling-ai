@@ -289,9 +289,139 @@ async def delete_project(project_id: int):
 async def delete_memory(memory_id: str):
     """删除记忆"""
     if xuanling_app:
-        await xuanling_app.memory.delete(memory_id)
+        await xuanling_app.memory.delete_memory(memory_id)
         return {"status": "ok"}
     return {"status": "error"}
+
+
+# ============ 模型配置接口 ============
+# 内置模型列表
+BUILTIN_MODELS = [
+    {"id": "minimax", "name": "MiniMax", "default_url": "https://code.coolyeah.net/v1", "default_model": "MiniMax-M2.5"},
+    {"id": "openai", "name": "OpenAI", "default_url": "https://api.openai.com/v1", "default_model": "gpt-4"},
+    {"id": "anthropic", "name": "Claude", "default_url": "https://api.anthropic.com/v1", "default_model": "claude-3-opus-20240229"},
+    {"id": "custom", "name": "自定义", "default_url": "", "default_model": ""},
+]
+
+
+@app.get("/models")
+async def list_models():
+    """获取可用模型列表"""
+    if xuanling_app:
+        current = xuanling_app.config.get("model", {})
+        current_provider = current.get("provider", "mock")
+        current_url = current.get("base_url", "")
+        current_key = current.get("api_key", "")
+        current_model = current.get("model", "")
+        
+        # 合并内置模型和自定义模型
+        models = []
+        for m in BUILTIN_MODELS:
+            is_active = (m["id"] == current_provider)
+            models.append({
+                **m,
+                "is_active": is_active,
+                "url": current_url if is_active else m["default_url"],
+                "model": current_model if is_active else m["default_model"]
+            })
+        
+        return {
+            "models": models,
+            "current": {
+                "provider": current_provider,
+                "url": current_url,
+                "model": current_model,
+                "has_key": bool(current_key and len(current_key) > 5)
+            }
+        }
+    return {"models": BUILTIN_MODELS}
+
+
+@app.post("/models")
+async def add_model(body: dict = None):
+    """添加自定义模型"""
+    if body is None:
+        body = {}
+    name = body.get("name")
+    url = body.get("url")
+    model = body.get("model")
+    
+    # 保存到配置文件
+    config_file = Path(__file__).parent.parent / "config.yaml"
+    import yaml
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    if "custom_models" not in config:
+        config["custom_models"] = []
+    
+    config["custom_models"].append({
+        "name": name,
+        "url": url,
+        "model": model
+    })
+    
+    with open(config_file, 'w') as f:
+        yaml.dump(config, f)
+    
+    return {"status": "ok", "message": f"已添加模型: {name}"}
+
+
+@app.post("/models/{provider}/activate")
+async def activate_model(provider: str, body: dict = None):
+    """激活模型"""
+    if body is None:
+        body = {}
+    api_key = body.get("api_key", "")
+    api_url = body.get("api_url", "")
+    model = body.get("model", "")
+    
+    # 保存到配置文件 - 修复路径
+    config_file = Path(__file__).parent.parent / "config.yaml"
+    print(f"📁 配置文件路径: {config_file}")
+    import yaml
+    with open(config_file, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # 更新配置
+    config["model"]["provider"] = provider
+    
+    # 获取默认URL
+    for m in BUILTIN_MODELS:
+        if m["id"] == provider:
+            if not api_url:
+                api_url = m["default_url"]
+            if not model:
+                model = m["default_model"]
+            break
+    
+    if api_key:
+        config["model"]["api_key"] = api_key
+    if api_url:
+        config["model"]["base_url"] = api_url
+    if model:
+        config["model"]["model"] = model
+    
+    with open(config_file, 'w') as f:
+        yaml.dump(config, f)
+    
+    # 重新加载配置并重建组件
+    if xuanling_app:
+        xuanling_app.config = xuanling_app._load_config()
+        xuanling_app.model = ModelRouter(xuanling_app.config.get("model", {}))
+        xuanling_app.agent = Agent(
+            model=xuanling_app.model,
+            memory=xuanling_app.memory,
+            skills=xuanling_app.skills,
+            config=xuanling_app.config.get("agent", {"name": "玄灵AI"})
+        )
+        xuanling_app.gateway = Gateway(
+            agent=xuanling_app.agent,
+            plugins=xuanling_app.plugins,
+            config=xuanling_app.config.get("gateway", {})
+        )
+    
+    return {"status": "ok", "message": f"已激活模型: {provider}", "config": config["model"]}
 
 
 # ============ API配置接口 ============
@@ -303,14 +433,15 @@ async def get_config():
         return {
             "api_url": model_cfg.get("base_url", ""),
             "api_key": model_cfg.get("api_key", "")[:10] + "..." if model_cfg.get("api_key") else "",
-            "model": model_cfg.get("model", "")
+            "model": model_cfg.get("model", ""),
+            "provider": model_cfg.get("provider", "")
         }
     return {}
 
 
 @app.post("/config")
 async def update_config(body: dict = None):
-    """更新API配置"""
+    """更新API配置（内存）"""
     if body is None:
         body = {}
     api_url = body.get("api_url")
@@ -318,7 +449,7 @@ async def update_config(body: dict = None):
     model = body.get("model")
     
     if xuanling_app:
-        # 更新配置
+        # 更新内存配置
         if api_url:
             xuanling_app.config["model"]["base_url"] = api_url
         if api_key:
@@ -344,8 +475,40 @@ async def update_config(body: dict = None):
             config=xuanling_app.config.get("gateway", {})
         )
         
-        return {"status": "ok", "message": "配置已更新"}
+        return {"status": "ok", "message": "配置已更新（仅内存）"}
     return {"status": "error"}
+
+
+# ============ 技能接口 ============
+@app.get("/skills")
+async def list_skills():
+    """获取技能列表"""
+    if xuanling_app:
+        skills = xuanling_app.skills.get_skills()
+        # 如果没有加载到技能，返回默认列表
+        if not skills:
+            return {
+                "skills": [
+                    {"name": "💬 对话技能", "description": "智能对话和问答能力", "version": "1.0.0", "tools": ["chat", "qa"]},
+                    {"name": "🧠 记忆技能", "description": "长期和短期记忆管理", "version": "1.0.0", "tools": ["memory"]},
+                    {"name": "🛠️ 工具技能", "description": "调用外部工具执行各种任务", "version": "1.0.0", "tools": ["tools"]},
+                    {"name": "🔌 插件技能", "description": "飞书、Telegram集成", "version": "1.0.0", "tools": ["feishu", "telegram"]},
+                    {"name": "📝 写作技能", "description": "文章、文案创作", "version": "1.0.0", "tools": ["writing"]},
+                    {"name": "💻 编程技能", "description": "代码编写和调试", "version": "1.0.0", "tools": ["coding"]}
+                ]
+            }
+        return {"skills": skills}
+    return {"skills": []}
+
+
+@app.get("/skills/{skill_name}")
+async def get_skill(skill_name: str):
+    """获取单个技能详情"""
+    if xuanling_app:
+        skill = xuanling_app.skills.skills.get(skill_name)
+        if skill:
+            return skill.to_dict()
+    return {"error": "Skill not found"}
 
 
 # ============ 后台任务接口 ============
@@ -409,6 +572,88 @@ async def remove_task(task_name: str):
     from src.scheduler import scheduler
     scheduler.remove_task(task_name)
     return {"status": "ok"}
+
+
+# ============ 项目文件管理接口 ============
+@app.get("/project-manager/projects")
+async def list_all_projects():
+    """列出所有项目"""
+    from src.projects import project_manager
+    return {"projects": project_manager.list_projects()}
+
+
+@app.post("/project-manager/projects")
+async def create_project(body: dict = None):
+    """创建项目"""
+    if body is None:
+        body = {}
+    name = body.get("name", "")
+    description = body.get("description", "")
+    
+    if not name:
+        return {"status": "error", "message": "项目名称不能为空"}
+    
+    from src.projects import project_manager
+    result = project_manager.create_project(name, description)
+    return result
+
+
+@app.get("/project-manager/projects/{project_name}")
+async def get_project_detail(project_name: str):
+    """获取项目详情"""
+    from src.projects import project_manager
+    return project_manager.get_project(project_name)
+
+
+@app.delete("/project-manager/projects/{project_name}")
+async def delete_project_file(project_name: str):
+    """删除项目"""
+    from src.projects import project_manager
+    return project_manager.delete_project(project_name)
+
+
+@app.post("/project-manager/projects/{project_name}/memory")
+async def add_project_memory(project_name: str, body: dict = None):
+    """添加项目记忆"""
+    if body is None:
+        body = {}
+    title = body.get("title", "")
+    content = body.get("content", "")
+    tags = body.get("tags", [])
+    
+    from src.projects import project_manager
+    return project_manager.add_memory(project_name, title, content, tags)
+
+
+@app.post("/project-manager/projects/{project_name}/docs")
+async def add_project_doc(project_name: str, body: dict = None):
+    """添加项目文档"""
+    if body is None:
+        body = {}
+    title = body.get("title", "")
+    content = body.get("content", "")
+    
+    from src.projects import project_manager
+    return project_manager.add_doc(project_name, title, content)
+
+
+@app.get("/project-manager/projects/{project_name}/files/{file_path:path}")
+async def read_project_file(project_name: str, file_path: str):
+    """读取项目文件"""
+    from src.projects import project_manager
+    content = project_manager.read_file(project_name, file_path)
+    return {"content": content}
+
+
+@app.put("/project-manager/projects/{project_name}/files/{file_path:path}")
+async def write_project_file(project_name: str, file_path: str, body: dict = None):
+    """写入项目文件"""
+    if body is None:
+        body = {}
+    content = body.get("content", "")
+    from src.projects import project_manager
+    result = project_manager.write_file(project_name, file_path, content)
+    return result
 
 
 if __name__ == "__main__":

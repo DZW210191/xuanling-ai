@@ -145,12 +145,12 @@
     
     <div class="container">
         <div class="sidebar">
-            <div class="nav-item active" data-panel="chat"><span>💬</span> AI 对话</div>
-            <div class="nav-item" data-panel="projects"><span>📁</span> 项目管理</div>
-            <div class="nav-item" data-panel="memory"><span>🧠</span> 记忆系统</div>
-            <div class="nav-item" data-panel="skills"><span>🛠️</span> 技能商店</div>
-            <div class="nav-item" data-panel="settings"><span>⚙️</span> 系统设置</div>
-            <div class="nav-item" data-panel="local"><span>💻</span> 本地运行</div>
+            <div class="nav-item active" data-panel="chat" onclick="switchTo('chat')"><span>💬</span> AI 对话</div>
+            <div class="nav-item" data-panel="projects" onclick="switchTo('projects')"><span>📁</span> 项目管理</div>
+            <div class="nav-item" data-panel="memory" onclick="switchTo('memory')"><span>🧠</span> 记忆系统</div>
+            <div class="nav-item" data-panel="skills" onclick="switchTo('skills')"><span>🛠️</span> 技能商店</div>
+            <div class="nav-item" data-panel="settings" onclick="switchTo('settings')"><span>⚙️</span> 系统设置</div>
+            <div class="nav-item" data-panel="local" onclick="switchTo('local')"><span>💻</span> 本地运行</div>
         </div>
         
         <div class="main">
@@ -183,7 +183,13 @@
                     </div>
                 </div>
                 <div class="history-panel" id="historyPanel">
-                    <div class="history-header">对话历史</div>
+                    <div class="history-header">
+                        <span>对话历史</span>
+                        <button onclick="clearAllHistory()" style="float:right;background:none;border:none;color:#ef4444;cursor:pointer;font-size:12px;">清空</button>
+                    </div>
+                    <div style="padding:10px;border-bottom:1px solid rgba(102,126,234,0.2);">
+                        <input type="text" id="historySearch" placeholder="搜索历史..." onkeyup="searchHistory(this.value)" style="width:100%;padding:8px;border:1px solid rgba(102,126,234,0.3);border-radius:6px;background:rgba(0,0,0,0.3);color:#fff;font-size:12px;">
+                    </div>
                     <div class="history-list" id="historyList"></div>
                 </div>
             </div>
@@ -203,13 +209,8 @@
             <!-- 技能面板 -->
             <div class="panel" id="skills">
                 <h2 class="panel-title">🛠️ 技能商店</h2>
-                <div class="skills-grid">
-                    <div class="skill-card"><div class="skill-name">💬 对话技能</div><div class="skill-desc">智能对话和问答能力</div></div>
-                    <div class="skill-card"><div class="skill-name">🧠 记忆技能</div><div class="skill-desc">长期和短期记忆管理</div></div>
-                    <div class="skill-card"><div class="skill-name">🛠️ 工具技能</div><div class="skill-desc">调用外部工具和能力</div></div>
-                    <div class="skill-card"><div class="skill-name">🔌 插件技能</div><div class="skill-desc">飞书、Telegram集成</div></div>
-                    <div class="skill-card"><div class="skill-name">📝 写作技能</div><div class="skill-desc">文章、文案创作</div></div>
-                    <div class="skill-card"><div class="skill-name">💻 编程技能</div><div class="skill-desc">代码编写和调试</div></div>
+                <div class="skills-grid" id="skillsGrid">
+                    <div style="color:#666;padding:20px;">加载中...</div>
                 </div>
             </div>
             
@@ -217,42 +218,46 @@
             <div class="panel" id="settings">
                 <h2 class="panel-title">⚙️ 系统设置</h2>
                 <div class="settings-form">
-                    <div class="form-group"><label class="form-label">API 地址</label><input type="text" class="form-input" id="apiUrl" value="https://code.coolyeah.net/v1"></div>
-                    <div class="form-group"><label class="form-label">API Key</label><input type="password" class="form-input" id="apiKey" value="sk-xxxxx...xxxxx"></div>
-                    <div class="form-group"><label class="form-label">模型名称</label><input type="text" class="form-input" id="modelName" value="MiniMax-M2.5"></div>
-                    <button class="save-btn" onclick="saveSettings()">保存设置</button>
+                    <!-- 模型选择 -->
+                    <div class="form-group">
+                        <label class="form-label">选择模型</label>
+                        <select class="form-input" id="modelSelect" onchange="onModelChange()">
+                            <option value="">加载中...</option>
+                        </select>
+                    </div>
+                    
+                    <!-- 当前模型信息 -->
+                    <div id="currentModelInfo" style="background:rgba(102,126,234,0.1);padding:15px;border-radius:8px;margin-bottom:15px;display:none;">
+                        <div style="color:#667eea;font-weight:bold;margin-bottom:10px;">当前模型信息</div>
+                        <div style="font-size:13px;color:#a0aec0;">
+                            <div>API 地址: <span id="currentApiUrl" style="color:#fff;"></span></div>
+                            <div>模型: <span id="currentModel" style="color:#fff;"></span></div>
+                            <div>API Key: <span id="currentApiKey" style="color:#4ade80;">已配置</span></div>
+                        </div>
+                    </div>
+                    
+                    <!-- API 配置 -->
+                    <div class="form-group"><label class="form-label">API 地址</label><input type="text" class="form-input" id="apiUrl" placeholder="https://api.example.com/v1"></div>
+                    <div class="form-group"><label class="form-label">API Key</label><input type="password" class="form-input" id="apiKey" placeholder="sk-xxx..."></div>
+                    <div class="form-group"><label class="form-label">模型名称</label><input type="text" class="form-input" id="modelName" placeholder="gpt-4, MiniMax-M2.5..."></div>
+                    
+                    <button class="save-btn" onclick="saveSettings()">💾 保存并应用</button>
+                    
+                    <!-- 添加自定义模型 -->
+                    <div style="margin-top:25px;padding-top:20px;border-top:1px solid rgba(102,126,234,0.2);">
+                        <div style="color:#667eea;font-weight:bold;margin-bottom:15px;">➕ 添加自定义模型</div>
+                        <div class="form-group"><label class="form-label">模型名称</label><input type="text" class="form-input" id="customModelName" placeholder="自定义模型名"></div>
+                        <div class="form-group"><label class="form-label">API 地址</label><input type="text" class="form-input" id="customApiUrl" placeholder="https://api.example.com/v1"></div>
+                        <div class="form-group"><label class="form-label">模型 ID</label><input type="text" class="form-input" id="customModelId" placeholder="如: gpt-4, claude-3..."></div>
+                        <button class="save-btn" style="background:rgba(102,126,234,0.3);" onclick="addCustomModel()">➕ 添加模型</button>
+                    </div>
                 </div>
             </div>
             
             <!-- 本地运行面板 -->
             <div class="panel" id="local">
-                <h2 class="panel-title">💻 本地运行指南</h2>
-                <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:600px;">
-                    <h3 style="color:#667eea;margin-bottom:15px;">快速开始</h3>
-                    <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.6;">
-# 1. 克隆项目
-git clone https://github.com/DZW210191/xuanling-ai.git
-cd xuanling-ai
-
-# 2. 安装依赖
-pip install -r requirements.txt
-
-# 3. 配置环境变量
-export API_KEY="你的API_KEY"
-export API_BASE_URL="https://code.coolyeah.net/v1"
-
-# 4. 运行
-python src/main.py</pre>
-                    
-                    <h3 style="color:#667eea;margin:20px 0 15px;">或使用 Docker</h3>
-                    <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow-x:auto;font-size:13px;">
-# 构建并运行
-docker build -t xuanling-ai .
-docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
-                    
-                    <h3 style="color:#667eea;margin:20px 0 15px;">访问地址</h3>
-                    <p style="color:#a0aec0;">启动后访问: <span style="color:#4ade80;">http://localhost:8000</span></p>
-                </div>
+                <h2 class="panel-title">💻 本地运行状态</h2>
+                <div id="localStatus" style="color:#666;padding:20px;">加载中...</div>
             </div>
         </div>
     </div>
@@ -287,11 +292,13 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
     
     <!-- 项目详情弹窗 -->
     <div class="modal" id="projectDetailModal">
-        <div class="modal-content" style="width:450px;">
+        <div class="modal-content" style="width:600px;max-height:80vh;overflow-y:auto;">
             <div class="modal-title" id="projectDetailTitle"></div>
+            
+            <!-- 项目信息编辑 -->
             <div class="form-group">
                 <label class="form-label">项目描述</label>
-                <textarea class="form-input" id="projectDetailDesc" rows="3" style="resize:vertical;"></textarea>
+                <textarea class="form-input" id="projectDetailDesc" rows="2" style="resize:vertical;"></textarea>
             </div>
             <div class="form-group">
                 <label class="form-label">状态</label>
@@ -302,17 +309,82 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
                     <option value="已暂停">已暂停</option>
                 </select>
             </div>
+            
+            <!-- 项目文件列表 -->
+            <div style="margin-top:20px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <label class="form-label" style="margin:0;">📁 项目文件</label>
+                    <button onclick="refreshProjectFiles()" style="background:none;border:none;color:#667eea;cursor:pointer;font-size:12px;">🔄 刷新</button>
+                </div>
+                <div id="projectFilesList" style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;">
+                    <div style="color:#666;text-align:center;padding:20px;">加载中...</div>
+                </div>
+            </div>
+            
+            <!-- 文件操作 -->
+            <div id="fileEditor" style="display:none;margin-top:15px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                    <label class="form-label" style="margin:0;" id="currentFileName"></label>
+                    <button onclick="closeFileEditor()" style="background:none;border:none;color:#ef4444;cursor:pointer;">✕</button>
+                </div>
+                <textarea class="form-input" id="fileContent" rows="10" style="font-family:monospace;font-size:12px;"></textarea>
+                <button class="save-btn" style="margin-top:10px;width:100%;" onclick="saveFile()">💾 保存文件</button>
+            </div>
+            
             <div class="modal-buttons">
-                <button class="modal-btn cancel" style="background:#ef4444;" onclick="deleteProject()">删除</button>
-                <button class="modal-btn cancel" onclick="closeProjectDetail()">取消</button>
+                <button class="modal-btn cancel" style="background:#ef4444;" onclick="deleteProject()">删除项目</button>
+                <button class="modal-btn cancel" onclick="closeProjectDetail()">关闭</button>
                 <button class="modal-btn confirm" onclick="saveProject()">保存</button>
             </div>
         </div>
     </div>
     
     <script>
-        const API_BASE = 'http://106.55.107.63:8000';
+        // 获取当前主机作为API地址
+        const API_BASE = window.location.origin;
+        
+        // 全局切换面板函数
+        window.switchTo = function(panelId) {
+            document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});
+            document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active')});
+            var nav = document.querySelector('[data-panel="' + panelId + '"]');
+            if (nav) nav.classList.add('active');
+            var panel = document.getElementById(panelId);
+            if (panel) panel.classList.add('active');
+            if (panelId === 'projects') loadProjects();
+            if (panelId === 'memory') loadMemories();
+            if (panelId === 'settings') loadSettings();
+            if (panelId === 'skills') loadSkills();
+            if (panelId === 'local') loadLocalStatus();
+        }
         let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+        
+        // 页面加载时恢复聊天历史
+        function loadChatHistory() {
+            const messagesDiv = document.getElementById('messages');
+            if (!messagesDiv) return;
+            
+            if (chatHistory.length === 0) {
+                // 首次访问，显示欢迎消息
+                messagesDiv.innerHTML = '<div class="message ai"><div class="message-content">你好！我是<strong>玄灵AI</strong> 🧚<br><br>我可以帮助你：<br>• 智能对话和问答<br>• 管理项目<br>• 记忆重要信息<br>• 执行各种任务<br><br>有什么可以帮你的吗？</div></div>';
+                return;
+            }
+            
+            // 恢复历史消息
+            let html = '';
+            chatHistory.forEach(h => {
+                if (h.user) {
+                    html += '<div class="message user"><div class="message-content">' + 
+                        (h.user || '').replace(/\n/g, '<br>') + '</div></div>';
+                }
+                if (h.ai) {
+                    html += '<div class="message ai"><div class="message-content">' + 
+                        (h.ai || '').replace(/\n/g, '<br>') + '</div></div>';
+                }
+            });
+            messagesDiv.innerHTML = html;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
         
         // 检查API连接状态
         async function checkApiStatus() {
@@ -340,6 +412,9 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
             const navItems = document.querySelectorAll('.nav-item');
             console.log('导航项数量:', navItems.length);
             
+            // 恢复聊天历史
+            loadChatHistory();
+            
             navItems.forEach(item => {
                 item.addEventListener('click', function(e) {
                     console.log('点击了:', this.dataset.panel);
@@ -363,6 +438,8 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
                     if (panelId === 'projects') loadProjects();
                     if (panelId === 'memory') loadMemories();
                     if (panelId === 'settings') loadSettings();
+                    if (panelId === 'skills') loadSkills();
+                    if (panelId === 'local') loadLocalStatus();
                 });
             });
         });
@@ -424,45 +501,255 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
             renderHistory();
         }
         
-        function renderHistory() {
+        function renderHistory(filter = '') {
             const list = document.getElementById('historyList');
-            if (chatHistory.length === 0) {
+            let filtered = chatHistory;
+            
+            // 搜索过滤
+            if (filter) {
+                const lowerFilter = filter.toLowerCase();
+                filtered = chatHistory.filter(h => 
+                    h.user.toLowerCase().includes(lowerFilter) || 
+                    (h.ai && h.ai.toLowerCase().includes(lowerFilter))
+                );
+            }
+            
+            if (filtered.length === 0) {
                 list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">暂无历史记录</div>';
                 return;
             }
-            list.innerHTML = chatHistory.slice(-10).reverse().map((h, i) => '<div class="history-item" onclick="loadHistory(' + (chatHistory.length - 1 - i) + ')"><div class="history-item-title">' + h.user.substring(0, 30) + '</div><div class="history-item-time">' + new Date(h.time).toLocaleString() + '</div></div>').join('');
+            
+            // 显示最近20条（包含删除按钮）
+            list.innerHTML = filtered.slice(-20).reverse().map((h, i) => {
+                const realIndex = chatHistory.indexOf(h);
+                return '<div class="history-item" onclick="loadHistory(' + realIndex + ')"><div class="history-item-title">' + 
+                    h.user.substring(0, 25) + (h.user.length > 25 ? '...' : '') + '</div>' +
+                    '<div class="history-item-time">' + new Date(h.time).toLocaleString() + 
+                    ' <span onclick="deleteHistoryItem(event, ' + realIndex + ')" style="color:#ef4444;cursor:pointer;margin-left:10px;">🗑️</span></div></div>';
+            }).join('');
         }
         
         function loadHistory(index) {
             const h = chatHistory[index];
-            document.getElementById('messages').innerHTML = '<div class="message user"><div class="message-content">' + h.user.replace(/\n/g, '<br>') + '</div></div><div class="message ai"><div class="message-content">' + h.ai.replace(/\n/g, '<br>') + '</div></div>';
+            if (!h) return;
+            document.getElementById('messages').innerHTML = '<div class="message user"><div class="message-content">' + 
+                (h.user || '').replace(/\n/g, '<br>') + '</div></div><div class="message ai"><div class="message-content">' + 
+                (h.ai || '').replace(/\n/g, '<br>') + '</div></div>';
             document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
+        }
+        
+        function searchHistory(query) {
+            renderHistory(query);
+        }
+        
+        function deleteHistoryItem(event, index) {
+            event.stopPropagation();
+            if (!confirm('确定删除这条对话？')) return;
+            chatHistory.splice(index, 1);
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            renderHistory(document.getElementById('historySearch')?.value || '');
+        }
+        
+        function clearAllHistory() {
+            if (!confirm('确定清空所有对话历史？此操作不可恢复！')) return;
+            chatHistory = [];
+            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+            renderHistory();
         }
         
         // 项目
         let allProjects = [];
         
-        async function loadProjects() {
+        // Event delegation for project cards
+document.addEventListener('click', function(e) {
+    var card = e.target.closest('.project-card');
+    if (card && card.dataset.name) {
+        showProjectDetail(card.dataset.name);
+    }
+});
+
+async function loadProjects() {
             try {
-                const resp = await fetch(API_BASE + '/projects');
+                const resp = await fetch(API_BASE + '/project-manager/projects');
                 const data = await resp.json();
                 allProjects = data.projects || [];
                 const grid = document.getElementById('projectsGrid');
-                grid.innerHTML = allProjects.map((p, idx) => '<div class="project-card" onclick="showProjectDetail(' + idx + ')"><div class="project-icon">' + (p.icon || '📁') + '</div><div class="project-name">' + p.name + '</div><div class="project-desc">' + (p.description || '暂无描述') + '</div><div class="project-status">' + (p.status || '开发中') + '</div></div>').join('') + '<div class="add-card" onclick="showModal()"><span>+</span><p>添加项目</p></div>';
+                if (allProjects.length === 0) {
+                    grid.innerHTML = '<div style="color:#666;padding:40px;text-align:center;">暂无项目<br><br><button onclick="showCreateProject()" style="background:rgba(102,126,234,0.3);border:none;color:#667eea;padding:10px 20px;border-radius:6px;cursor:pointer;">➕ 创建第一个项目</button></div>';
+                    return;
+                }
+                grid.innerHTML = allProjects.map(p => '<div class="project-card" data-name="' + p.name + '"><div class="project-icon">📁</div><div class="project-name">' + p.name + '</div><div class="project-desc">' + (p.description || '暂无描述') + '</div></div>').join('') + '<div class="add-card" onclick="showCreateProject()"><span>+</span><p>添加项目</p></div>';
             } catch (e) { 
                 console.error(e); 
-                document.getElementById('projectsGrid').innerHTML = '<div style="color:#ef4444;padding:20px;">无法加载项目，请检查后端服务</div><div class="add-card" onclick="showModal()"><span>+</span><p>添加项目</p></div>';
+                document.getElementById('projectsGrid').innerHTML = '<div style="color:#ef4444;padding:20px;">无法加载项目</div>';
             }
         }
         
-        function showProjectDetail(idx) {
-            const p = allProjects[idx];
-            if (!p) return;
-            currentProjectId = p.id;
-            document.getElementById('projectDetailTitle').textContent = p.name;
-            document.getElementById('projectDetailDesc').value = p.description || '';
-            document.getElementById('projectDetailStatus').value = p.status || '开发中';
+        // 项目点击 - 显示详情弹窗
+        let currentEditingFile = null;
+        
+        async function showProjectDetail(projectName) {
+            const project = allProjects.find(p => p.name === projectName);
+            if (!project) return;
+            
+            currentProjectId = project.id || project.name;
+            currentProjectName = project.name;
+            document.getElementById('projectDetailTitle').textContent = project.name;
+            document.getElementById('projectDetailDesc').value = project.description || '';
+            document.getElementById('projectDetailStatus').value = project.status || '开发中';
+            
+            // 隐藏文件编辑器
+            document.getElementById('fileEditor').style.display = 'none';
+            
+            // 加载项目文件
+            loadProjectFiles(projectName);
+            
             document.getElementById('projectDetailModal').classList.add('show');
+        }
+        
+        // 加载项目文件列表
+        async function loadProjectFiles(projectName) {
+            const filesList = document.getElementById('projectFilesList');
+            filesList.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">加载中...</div>';
+            
+            try {
+                const resp = await fetch(API_BASE + '/project-manager/projects/' + projectName);
+                const data = await resp.json();
+                
+                if (data.error) {
+                    filesList.innerHTML = '<div style="color:#ef4444;padding:20px;">' + data.error + '</div>';
+                    return;
+                }
+                
+                const files = data.files || [];
+                const project = data.project || {};
+                
+                if (files.length === 0) {
+                    filesList.innerHTML = '<div style="color:#666;padding:20px;">项目为空，还没有文件</div>';
+                    return;
+                }
+                
+                // 按类型分组显示
+                const folders = {};
+                const rootFiles = [];
+                
+                files.forEach(f => {
+                    const parts = f.path.split('/');
+                    if (parts.length > 1) {
+                        const folder = parts[0];
+                        if (!folders[folder]) folders[folder] = [];
+                        folders[folder].push(f);
+                    } else {
+                        rootFiles.push(f);
+                    }
+                });
+                
+                let html = '';
+                
+                // 显示文件夹
+                Object.keys(folders).sort().forEach(folder => {
+                    html += '<div style="margin-bottom:10px;">';
+                    html += '<div style="color:#667eea;font-size:12px;margin-bottom:5px;">📁 ' + folder + '/</div>';
+                    folders[folder].forEach(f => {
+                        const icon = getFileIcon(f.path);
+                        const size = formatFileSize(f.size);
+                        html += '<div onclick="viewFile(\'' + projectName + '\',\'' + f.path + '\')" style="padding:5px 10px;cursor:pointer;font-size:12px;color:#a0aec0;hover:{background:rgba(102,126,234,0.2);}">' + 
+                            icon + ' ' + f.path + ' <span style="color:#666;">' + size + '</span></div>';
+                    });
+                    html += '</div>';
+                });
+                
+                // 显示根目录文件
+                rootFiles.forEach(f => {
+                    const icon = getFileIcon(f.path);
+                    const size = formatFileSize(f.size);
+                    html += '<div onclick="viewFile(\'' + projectName + '\',\'' + f.path + '\')" style="padding:5px 10px;cursor:pointer;font-size:12px;color:#a0aec0;">' + 
+                        icon + ' ' + f.path + ' <span style="color:#666;">' + size + '</span></div>';
+                });
+                
+                filesList.innerHTML = html;
+            } catch (e) {
+                filesList.innerHTML = '<div style="color:#ef4444;padding:20px;">加载失败: ' + e.message + '</div>';
+            }
+        }
+        
+        // 获取文件图标
+        function getFileIcon(path) {
+            const ext = path.split('.').pop().toLowerCase();
+            const icons = {
+                'md': '📝', 'txt': '📄', 'json': '📋', 'yaml': '⚙️', 'yml': '⚙️',
+                'py': '🐍', 'js': '📜', 'ts': '📜', 'html': '🌐', 'css': '🎨',
+                'png': '🖼️', 'jpg': '🖼️', 'jpeg': '🖼️', 'gif': '🖼️', 'svg': '🖼️',
+                'zip': '📦', 'tar': '📦', 'gz': '📦',
+                'gitignore': '🔒', 'env': '🔒'
+            };
+            return icons[ext] || '📄';
+        }
+        
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + 'B';
+            if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + 'KB';
+            return (bytes/1024/1024).toFixed(1) + 'MB';
+        }
+        
+        // 查看文件内容
+        async function viewFile(projectName, filePath) {
+            try {
+                const resp = await fetch(API_BASE + '/project-manager/projects/' + projectName + '/files/' + filePath);
+                const data = await resp.json();
+                
+                currentEditingFile = { project: projectName, path: filePath };
+                document.getElementById('currentFileName').textContent = '📄 ' + filePath;
+                document.getElementById('fileContent').value = data.content || '';
+                document.getElementById('fileEditor').style.display = 'block';
+            } catch (e) {
+                alert('加载文件失败: ' + e.message);
+            }
+        }
+        
+        // 关闭文件编辑器
+        function closeFileEditor() {
+            document.getElementById('fileEditor').style.display = 'none';
+            currentEditingFile = null;
+        }
+        
+        // 保存文件
+        async function saveFile() {
+            if (!currentEditingFile) return;
+            
+            const content = document.getElementById('fileContent').value;
+            try {
+                await fetch(API_BASE + '/project-manager/projects/' + currentEditingFile.project + '/files/' + currentEditingFile.path, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({content})
+                });
+                alert('✅ 文件保存成功！');
+            } catch (e) {
+                alert('❌ 保存失败: ' + e.message);
+            }
+        }
+        
+        // 刷新项目文件
+        function refreshProjectFiles() {
+            if (currentProjectName) {
+                loadProjectFiles(currentProjectName);
+            }
+        }
+        
+        function showCreateProject() {
+            const name = prompt('项目名称:');
+            if (!name) return;
+            const desc = prompt('项目描述:') || '';
+            fetch(API_BASE + '/project-manager/projects', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, description: desc})
+            }).then(r => r.json()).then(data => {
+                if (data.status === 'ok') alert('✅ 创建成功！');
+                loadProjects();
+            });
         }
         
         function closeProjectDetail() {
@@ -474,12 +761,28 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
             if (!currentProjectId) return;
             const desc = document.getElementById('projectDetailDesc').value;
             const status = document.getElementById('projectDetailStatus').value;
+            
+            // 判断是数据库项目还是文件项目
+            const isFileProject = !Number.isInteger(currentProjectId);
+            
             try {
-                await fetch(API_BASE + '/projects/' + currentProjectId, {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({description: desc, status: status})
-                });
+                if (isFileProject) {
+                    // 文件项目 - 更新 .project.json
+                    // 先删除旧的再重新创建
+                    await fetch(API_BASE + '/project-manager/projects/' + currentProjectId, { method: 'DELETE' });
+                    await fetch(API_BASE + '/project-manager/projects', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({name: currentProjectName, description: desc})
+                    });
+                } else {
+                    // 数据库项目
+                    await fetch(API_BASE + '/projects/' + currentProjectId, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({description: desc, status: status})
+                    });
+                }
                 closeProjectDetail();
                 loadProjects();
             } catch (e) { alert('保存失败: ' + e.message); }
@@ -488,8 +791,15 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
         async function deleteProject() {
             if (!currentProjectId) return;
             if (!confirm('确定要删除这个项目吗？')) return;
+            
+            const isFileProject = !Number.isInteger(currentProjectId);
+            
             try {
-                await fetch(API_BASE + '/projects/' + currentProjectId, { method: 'DELETE' });
+                if (isFileProject) {
+                    await fetch(API_BASE + '/project-manager/projects/' + currentProjectId, { method: 'DELETE' });
+                } else {
+                    await fetch(API_BASE + '/projects/' + currentProjectId, { method: 'DELETE' });
+                }
                 closeProjectDetail();
                 loadProjects();
             } catch (e) { alert('删除失败: ' + e.message); }
@@ -529,7 +839,11 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
             }
         }
         
+        // 添加记忆弹窗变量
+        let isEditingMemory = false;
+        
         function showAddMemory() {
+            isEditingMemory = false;
             const title = prompt('记忆标题:');
             if (!title) return;
             const content = prompt('记忆内容:');
@@ -544,11 +858,29 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
         
         function editMemory(id) {
             if (!id) return;
-            if (!confirm('确定要删除这条记忆吗？')) return;
-            // 暂时用简单方式，实际应该调用删除API
-            fetch(API_BASE + '/memory/' + id, { method: 'DELETE' })
-                .then(() => loadMemories())
-                .catch(e => alert('删除失败: ' + e.message));
+            // 点击询问是编辑还是删除
+            const action = confirm('点击确定编辑，点击取消删除');
+            if (action) {
+                // 编辑
+                const newTitle = prompt('新的记忆标题:');
+                const newContent = prompt('新的记忆内容:');
+                if (!newTitle) return;
+                // 删除旧的添加新的
+                fetch(API_BASE + '/memory/' + id, { method: 'DELETE' })
+                    .then(() => fetch(API_BASE + '/memory/json', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({title: newTitle, content: newContent || '', tags: ''})
+                    }))
+                    .then(() => loadMemories())
+                    .catch(e => alert('编辑失败: ' + e.message));
+            } else {
+                // 删除
+                if (!confirm('确定要删除这条记忆吗？')) return;
+                fetch(API_BASE + '/memory/' + id, { method: 'DELETE' })
+                    .then(() => loadMemories())
+                    .catch(e => alert('删除失败: ' + e.message));
+            }
         }
         
         function saveSettings() { 
@@ -579,42 +911,234 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
             });
         }
         
-        // 加载后端配置
+        // 加载后端配置和模型列表
+        let availableModels = [];
+        
         async function loadSettings() {
             try {
+                // 获取模型列表
+                const modelsResp = await fetch(API_BASE + '/models');
+                const modelsData = await modelsResp.json();
+                availableModels = modelsData.models || [];
+                const current = modelsData.current || {};
+                
+                // 填充模型选择下拉框
+                const select = document.getElementById('modelSelect');
+                select.innerHTML = availableModels.map(m => 
+                    `<option value="${m.id}" ${m.is_active ? 'selected' : ''}>${m.name}</option>`
+                ).join('');
+                
+                // 显示当前模型信息
+                if (current.provider) {
+                    document.getElementById('currentModelInfo').style.display = 'block';
+                    document.getElementById('currentApiUrl').textContent = current.url || '未配置';
+                    document.getElementById('currentModel').textContent = current.model || '未设置';
+                }
+                
+                // 获取配置
                 const resp = await fetch(API_BASE + '/config');
                 const data = await resp.json();
                 if (data.api_url) document.getElementById('apiUrl').value = data.api_url;
                 if (data.model) document.getElementById('modelName').value = data.model;
-                // API Key 只显示掩码
-                if (data.api_key && data.api_key !== '...') {
-                    // 保持本地输入不变
-                }
+                
             } catch (e) { console.error('加载配置失败:', e); }
         }
         
-        // 技能数据
-        const skillsData = {
-            '💬 对话技能': { desc: '支持多轮对话、上下文理解、智能回复。可以进行日常问答、知识查询、情感交流等。', features: ['多轮对话', '上下文记忆', '智能问答', '情感理解'] },
-            '🧠 记忆技能': { desc: '长期记忆存储重要信息，短期记忆管理会话上下文。支持关键词搜索和记忆关联。', features: ['长期记忆', '短期记忆', '记忆搜索', '关联分析'] },
-            '🛠️ 工具技能': { desc: '调用外部工具执行各种任务，如搜索信息、发送消息、操作文件等。', features: ['搜索工具', '文件操作', 'API调用', '任务执行'] },
-            '🔌 插件技能': { desc: '集成多种通讯平台，支持飞书、Telegram、微信等消息收发。', features: ['飞书集成', 'Telegram', '消息收发', '群组管理'] },
-            '📝 写作技能': { desc: '专业的文案创作能力，支持文章、剧本、广告文案等多种文体。', features: ['文章写作', '文案创作', '剧本编写', '翻译校对'] },
-            '💻 编程技能': { desc: '代码编写、调试、优化。支持Python、JavaScript、Go等多种语言。', features: ['代码编写', 'Bug调试', '代码优化', '技术咨询'] }
-        };
+        // 模型选择变化
+        function onModelChange() {
+            const select = document.getElementById('modelSelect');
+            const modelId = select.value;
+            const model = availableModels.find(m => m.id === modelId);
+            if (model) {
+                document.getElementById('apiUrl').value = model.url || '';
+                document.getElementById('modelName').value = model.model || '';
+            }
+        }
         
-        // 初始化技能卡片点击
-        document.querySelectorAll('.skill-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const name = card.querySelector('.skill-name').textContent;
-                const data = skillsData[name];
-                if (data) {
-                    document.getElementById('skillDetailTitle').innerHTML = name + '<br><small style="color:#667eea;font-weight:normal;">' + data.features.join(' • ') + '</small>';
-                    document.getElementById('skillDetailDesc').textContent = data.desc;
-                    document.getElementById('skillDetail').classList.add('show');
-                }
-            });
-        });
+        // 保存设置
+        async function saveSettings() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const modelName = document.getElementById('modelName').value;
+            const modelSelect = document.getElementById('modelSelect');
+            const provider = modelSelect.value;
+            
+            // 保存到本地
+            localStorage.setItem('xuanling_settings', JSON.stringify({
+                apiUrl, apiKey, modelName, provider
+            }));
+            
+            try {
+                // 发送到后端保存
+                const resp = await fetch(API_BASE + '/config', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        api_url: apiUrl,
+                        api_key: apiKey,
+                        model: modelName
+                    })
+                });
+                const data = await resp.json();
+                
+                // 激活模型
+                await fetch(API_BASE + '/models/' + provider + '/activate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        api_url: apiUrl,
+                        api_key: apiKey,
+                        model: modelName
+                    })
+                });
+                
+                alert('✅ 设置已保存并生效！');
+                loadSettings(); // 刷新
+            } catch (e) {
+                alert('⚠️ 保存失败: ' + e.message);
+            }
+        }
+        
+        // 添加自定义模型
+        async function addCustomModel() {
+            const name = document.getElementById('customModelName').value;
+            const url = document.getElementById('customApiUrl').value;
+            const model = document.getElementById('customModelId').value;
+            
+            if (!name || !url || !model) {
+                alert('请填写所有字段');
+                return;
+            }
+            
+            try {
+                await fetch(API_BASE + '/models', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name, url, model})
+                });
+                alert('✅ 自定义模型添加成功！');
+                // 清空输入
+                document.getElementById('customModelName').value = '';
+                document.getElementById('customApiUrl').value = '';
+                document.getElementById('customModelId').value = '';
+                loadSettings(); // 刷新
+            } catch (e) {
+                alert('❌ 添加失败: ' + e.message);
+            }
+        }
+        
+        // 技能数据 - 从后端获取
+        let skillsData = {};
+        
+        async function loadSkills() {
+            try {
+                const resp = await fetch(API_BASE + '/skills');
+                const data = await resp.json();
+                const skills = data.skills || [];
+                const grid = document.getElementById('skillsGrid');
+                
+                // 构建技能数据用于弹窗显示
+                skillsData = {};
+                skills.forEach(s => {
+                    skillsData[s.name] = {
+                        desc: s.description || '暂无描述',
+                        features: s.tools || []
+                    };
+                });
+                
+                grid.innerHTML = skills.map(s => '<div class="skill-card" data-name="' + s.name + '"><div class="skill-name">' + s.name + '</div><div class="skill-desc">' + (s.description || '暂无描述') + '</div></div>').join('') || '<div style="color:#666;padding:20px;">暂无技能</div>';
+                
+                // 重新绑定点击事件
+                document.querySelectorAll('.skill-card').forEach(card => {
+                    card.addEventListener('click', () => {
+                        const name = card.dataset.name;
+                        const skillData = skillsData[name];
+                        if (skillData) {
+                            document.getElementById('skillDetailTitle').innerHTML = name + '<br><small style="color:#667eea;font-weight:normal;">' + (skillData.features.join ? skillData.features.join(' • ') : skillData.features || '无工具') + '</small>';
+                            document.getElementById('skillDetailDesc').textContent = skillData.desc;
+                            document.getElementById('skillDetail').classList.add('show');
+                        }
+                    });
+                });
+            } catch (e) {
+                console.error('加载技能失败:', e);
+                document.getElementById('skillsGrid').innerHTML = '<div style="color:#ef4444;padding:20px;">无法加载技能，请检查后端服务</div>';
+            }
+        }
+
+        // 本地运行状态
+        async function loadLocalStatus() {
+            const statusDiv = document.getElementById('localStatus');
+            const apiBase = window.location.origin;
+            
+            try {
+                // 检查后端健康状态
+                const resp = await fetch(apiBase + '/health');
+                const health = await resp.json();
+                
+                // 获取配置
+                const configResp = await fetch(apiBase + '/config');
+                const config = await configResp.json();
+                
+                // 获取模型列表
+                const modelsResp = await fetch(apiBase + '/models');
+                const modelsData = await modelsResp.json();
+                
+                // 获取后台任务
+                const tasksResp = await fetch(apiBase + '/bg-tasks');
+                const tasksData = await tasksResp.json();
+                
+                const currentModel = modelsData.current || {};
+                
+                statusDiv.innerHTML = `
+                    <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:600px;">
+                        <h3 style="color:#4ade80;margin-bottom:15px;">✅ 服务运行中</h3>
+                        <div style="margin:15px 0;">
+                            <div style="color:#a0aec0;margin-bottom:5px;">API 地址</div>
+                            <div style="color:#fff;">${config.api_url || '未配置'}</div>
+                        </div>
+                        <div style="margin:15px 0;">
+                            <div style="color:#a0aec0;margin-bottom:5px;">当前模型</div>
+                            <div style="color:#fff;">${config.model || '未设置'}</div>
+                        </div>
+                        <div style="margin:15px 0;">
+                            <div style="color:#a0aec0;margin-bottom:5px;">服务供应商</div>
+                            <div style="color:#fff;">${config.provider || '未知'}</div>
+                        </div>
+                        <div style="margin:15px 0;">
+                            <div style="color:#a0aec0;margin-bottom:5px;">后台任务</div>
+                            <div style="color:#fff;">${tasksData.tasks ? tasksData.tasks.length : 0} 个任务</div>
+                        </div>
+                        
+                        <h3 style="color:#667eea;margin:20px 0 15px;">快速命令</h3>
+                        <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.6;">
+# 查看日志
+tail -f /tmp/xuanling.log
+
+# 重启服务
+python3 /root/.openclaw/workspace/xuanling/src/main.py
+
+# Docker 部署
+docker build -t xuanling-ai /root/.openclaw/workspace/xuanling/
+docker run -d -p 8000:8000 -e API_KEY=xxx xuanling-ai</pre>
+                    </div>
+                `;
+            } catch (e) {
+                statusDiv.innerHTML = `
+                    <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:600px;">
+                        <h3 style="color:#ef4444;margin-bottom:15px;">❌ 服务未运行</h3>
+                        <p style="color:#a0aec0;margin-bottom:15px;">无法连接到后端服务，请确保服务已启动。</p>
+                        <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.6;">
+# 启动服务
+cd /root/.openclaw/workspace/xuanling
+python3 src/main.py
+
+# 或使用 Docker
+docker run -d -p 8000:8000 xuanling-ai</pre>
+                    </div>
+                `;
+            }
+        }
         
         function closeSkillDetail() {
             document.getElementById('skillDetail').classList.remove('show');
@@ -622,6 +1146,7 @@ docker run -p 8000:8000 -e API_KEY=你的KEY xuanling-ai</pre>
         
         // 项目点击处理
         let currentProjectId = null;
+        let currentProjectName = null;
         
         // 加载设置
         const savedSettings = JSON.parse(localStorage.getItem('xuanling_settings') || '{}');

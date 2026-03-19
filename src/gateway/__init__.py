@@ -153,11 +153,26 @@ class Gateway:
         
         @self.router.route("项目")
         async def project_handler(message: Message) -> Response:
-            return Response(message="项目管理功能开发中...")
+            return Response(
+                message="📁 项目管理功能：\n\n"
+                       "我可以在控制台帮你管理项目，包括：\n"
+                       "• 创建新项目\n"
+                       "• 查看项目文件\n"
+                       "• 编辑项目文档\n"
+                       "• 删除项目\n\n"
+                       "请打开控制台 <a href='/'>玄灵AI控制台</a> 进入「项目管理」面板操作"
+            )
         
         @self.router.route("记忆")
         async def memory_handler(message: Message) -> Response:
-            return Response(message="记忆系统功能开发中...")
+            return Response(
+                message="🧠 记忆系统功能：\n\n"
+                       "我具备长期记忆能力，可以：\n"
+                       "• 记住你告诉我的重要信息\n"
+                       "• 记住你的偏好和习惯\n"
+                       "• 记住项目相关的知识\n\n"
+                       "请打开控制台 <a href='/'>玄灵AI控制台</a> 进入「记忆系统」面板查看"
+            )
     
     async def handle_message(self, message: Message) -> Response:
         """处理消息"""
