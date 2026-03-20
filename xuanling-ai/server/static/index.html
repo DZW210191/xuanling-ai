@@ -1316,76 +1316,147 @@ async function loadProjects() {
         async function loadLocalStatus() {
             const statusDiv = document.getElementById('localStatus');
             const apiBase = window.location.origin;
-            
             try {
-                // 检查后端健康状态
-                const resp = await fetch(apiBase + '/health');
-                const health = await resp.json();
-                
-                // 获取配置
-                const configResp = await fetch(apiBase + '/config');
-                const config = await configResp.json();
-                
-                // 获取模型列表
-                const modelsResp = await fetch(apiBase + '/models');
-                const modelsData = await modelsResp.json();
-                
-                // 获取后台任务
-                const tasksResp = await fetch(apiBase + '/bg-tasks');
-                const tasksData = await tasksResp.json();
-                
-                const currentModel = modelsData.current || {};
-                
+                // 并发拉取状态
+                const [healthResp, configResp, modelsResp, tasksResp, monitorResp, logsResp] = await Promise.all([
+                    fetch(apiBase + '/health'),
+                    fetch(apiBase + '/config'),
+                    fetch(apiBase + '/models'),
+                    fetch(apiBase + '/bg-tasks'),
+                    fetch(apiBase + '/api/monitor'),
+                    fetch(apiBase + '/api/logs?lines=80')
+                ]);
+                const [health, config, modelsData, tasksData, monitorData, logsHtml] = [
+                    await healthResp.json(),
+                    await configResp.json(),
+                    await modelsResp.json(),
+                    await tasksResp.json(),
+                    await monitorResp.json(),
+                    await logsResp.text()
+                ];
+                const steps = [
+                    health && health.status === 'ok' ? '健康检查 OK' : '健康检查失败',
+                    config ? '读取配置 OK' : '配置读取失败',
+                    modelsData ? '模型信息 OK' : '模型信息失败',
+                    tasksData ? `后台任务 ${tasksData.tasks ? tasksData.tasks.length : 0} 条` : '后台任务读取失败'
+                ];
+                const cpu = monitorData.cpu, mem = monitorData.memory, apiUsage = monitorData.api_usage, activeTasks = monitorData.tasks_active;
+                const now = new Date().toLocaleString();
+                const listenUrl = apiBase;
                 statusDiv.innerHTML = `
-                    <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:600px;">
-                        <h3 style="color:#4ade80;margin-bottom:15px;">✅ 服务运行中</h3>
-                        <div style="margin:15px 0;">
-                            <div style="color:#a0aec0;margin-bottom:5px;">API 地址</div>
-                            <div style="color:#fff;">${config.api_url || '未配置'}</div>
+                    <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:900px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <h3 style="color:#4ade80;margin:0;">✅ 服务运行中</h3>
+                            <div style="font-size:12px;color:#a0aec0;">上次检查：${now}</div>
                         </div>
-                        <div style="margin:15px 0;">
-                            <div style="color:#a0aec0;margin-bottom:5px;">当前模型</div>
-                            <div style="color:#fff;">${config.model || '未设置'}</div>
+                        <div style="margin-top:12px;color:#a0aec0;">监听地址：<span style="color:#fff;">${listenUrl}</span></div>
+                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:15px 0;">
+                            <div style="background:rgba(74,222,128,0.15);padding:12px;border-radius:8px;text-align:center;">
+                                <div style="color:#4ade80;font-weight:bold;font-size:18px;">${cpu}%</div><div style="font-size:12px;color:#a0aec0;">CPU</div>
+                            </div>
+                            <div style="background:rgba(102,126,234,0.15);padding:12px;border-radius:8px;text-align:center;">
+                                <div style="color:#667eea;font-weight:bold;font-size:18px;">${mem}%</div><div style="font-size:12px;color:#a0aec0;">内存</div>
+                            </div>
+                            <div style="background:rgba(248,113,113,0.15);padding:12px;border-radius:8px;text-align:center;">
+                                <div style="color:#f87171;font-weight:bold;font-size:18px;">${activeTasks}</div><div style="font-size:12px;color:#a0aec0;">活跃任务</div>
+                            </div>
+                            <div style="background:rgba(234,179,8,0.15);padding:12px;border-radius:8px;text-align:center;">
+                                <div style="color:#eab308;font-weight:bold;font-size:18px;">${apiUsage}%</div><div style="font-size:12px;color:#a0aec0;">API 使用</div>
+                            </div>
                         </div>
-                        <div style="margin:15px 0;">
-                            <div style="color:#a0aec0;margin-bottom:5px;">服务供应商</div>
-                            <div style="color:#fff;">${config.provider || '未知'}</div>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
+                            <div>
+                                <div style="color:#a0aec0;margin-bottom:5px;">API 地址</div>
+                                <div style="color:#fff;word-break:break-all;">${config.api_url || '未配置'}</div>
+                            </div>
+                            <div>
+                                <div style="color:#a0aec0;margin-bottom:5px;">当前模型</div>
+                                <div style="color:#fff;">${config.model || '未设置'}</div>
+                            </div>
+                            <div>
+                                <div style="color:#a0aec0;margin-bottom:5px;">供应商</div>
+                                <div style="color:#fff;">${config.provider || '未知'}</div>
+                            </div>
                         </div>
-                        <div style="margin:15px 0;">
-                            <div style="color:#a0aec0;margin-bottom:5px;">后台任务</div>
-                            <div style="color:#fff;">${tasksData.tasks ? tasksData.tasks.length : 0} 个任务</div>
+                        <div style="margin-top:12px;color:#a0aec0;">执行步骤</div>
+                        <ul style="margin:6px 0 12px 18px;color:#e2e8f0;">
+                            ${steps.map(s => `<li>${s}</li>`).join('')}
+                        </ul>
+                        <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+                            <button id="btnLocalRefresh" class="save-btn" style="background:rgba(102,126,234,0.5);">🔄 刷新</button>
+                            <button id="btnLocalAuto" class="save-btn" style="background:rgba(102,126,234,0.3);">⏱️ 自动刷新</button>
+                            <input id="adminTokenInput" type="password" placeholder="管理令牌 (可选)" style="flex:1;min-width:220px;padding:10px 14px;border:1px solid rgba(102,126,234,0.3);border-radius:8px;background:rgba(0,0,0,0.3);color:#fff;">
+                            <button id="btnSaveToken" class="save-btn" style="background:rgba(74,222,128,0.4);">🔐 保存令牌</button>
+                            <button id="btnRestart" class="save-btn" style="background:#ef4444;">🔁 重启服务</button>
                         </div>
-                        
-                        <h3 style="color:#667eea;margin:20px 0 15px;">快速命令</h3>
-                        <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.6;">
-# 查看日志
-tail -f /tmp/xuanling.log
+                        <div style="margin-top:12px;color:#a0aec0;">后端日志 (尾部)</div>
+                        <pre id="logTail" style="background:#0d1117;color:#9ca3af;padding:12px;border-radius:8px;max-height:240px;overflow:auto;">${logsHtml.replace(/</g,'&lt;')}</pre>
+                        <div style="margin-top:12px;color:#a0aec0;">快速命令</div>
+                        <pre style="background:#0d1117;padding:12px;border-radius:8px;overflow:auto;font-size:13px;line-height:1.6;"># 查看日志（浏览器）
+curl ${listenUrl}/api/logs
 
-# 重启服务
-python3 /root/.openclaw/workspace/xuanling/src/main.py
-
-# Docker 部署
-docker build -t xuanling-ai /root/.openclaw/workspace/xuanling/
-docker run -d -p 8000:8000 -e API_KEY=xxx xuanling-ai</pre>
+# 重启服务（如配置了管理令牌）
+curl -X POST ${listenUrl}/api/restart -H "X-Admin-Token: <token>"</pre>
                     </div>
                 `;
+                // 绑定交互
+                const btnRefresh = document.getElementById('btnLocalRefresh');
+                const btnAuto = document.getElementById('btnLocalAuto');
+                const btnRestart = document.getElementById('btnRestart');
+                const btnSaveToken = document.getElementById('btnSaveToken');
+                const adminTokenInput = document.getElementById('adminTokenInput');
+                // 载入已保存的令牌
+                try { adminTokenInput.value = localStorage.getItem('xuan_admin_token') || ''; } catch(_) {}
+                btnRefresh.addEventListener('click', () => loadLocalStatus());
+                btnAuto.addEventListener('click', () => {
+                    if (window._localRefresh) {
+                        clearInterval(window._localRefresh); window._localRefresh = null; btnAuto.textContent = '⏱️ 自动刷新';
+                    } else {
+                        window._localRefresh = setInterval(() => {
+                            // 仅在“本地运行”面板可见时刷新
+                            const panel = document.getElementById('local');
+                            if (panel && panel.classList.contains('active')) { loadLocalStatus(); } else { clearInterval(window._localRefresh); window._localRefresh = null; }
+                        }, 5000);
+                        btnAuto.textContent = '⏸️ 停止自动刷新';
+                    }
+                });
+                btnSaveToken.addEventListener('click', () => {
+                    try { localStorage.setItem('xuan_admin_token', adminTokenInput.value || ''); alert('已保存管理令牌（仅保存在本机浏览器）'); } catch(e) { alert('保存失败: '+e.message); }
+                });
+                btnRestart.addEventListener('click', async () => {
+                    if (!confirm('确定重启后端服务？')) return;
+                    const headers = {'Content-Type': 'application/json'};
+                    const t = (localStorage.getItem('xuan_admin_token') || '').trim();
+                    if (t) headers['X-Admin-Token'] = t;
+                    try {
+                        const resp = await fetch(apiBase + '/api/restart', {method:'POST', headers});
+                        const data = await resp.json();
+                        alert(data.message || '已发起重启');
+                        setTimeout(() => location.reload(), 3000);
+                    } catch (e) { alert('重启请求失败: ' + e.message); }
+                });
             } catch (e) {
+                const now = new Date().toLocaleString();
                 statusDiv.innerHTML = `
-                    <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:600px;">
-                        <h3 style="color:#ef4444;margin-bottom:15px;">❌ 服务未运行</h3>
-                        <p style="color:#a0aec0;margin-bottom:15px;">无法连接到后端服务，请确保服务已启动。</p>
-                        <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.6;">
-# 启动服务
-cd /root/.openclaw/workspace/xuanling
-python3 src/main.py
+                    <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:900px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <h3 style="color:#ef4444;margin:0;">❌ 服务未运行</h3>
+                            <div style="font-size:12px;color:#a0aec0;">上次检查：${now}</div>
+                        </div>
+                        <p style="color:#a0aec0;margin:10px 0 15px;">无法连接到后端服务，请确保服务已启动。</p>
+                        <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow:auto;font-size:13px;line-height:1.6;"># 启动服务（uvicorn）
+cd /root/.openclaw/workspace/xuanling-ai/server
+uvicorn main:app --host 0.0.0.0 --port 8000
 
-# 或使用 Docker
-docker run -d -p 8000:8000 xuanling-ai</pre>
+# 查看日志
+curl http://127.0.0.1:8000/api/logs</pre>
+                        <button id="btnLocalRetry" class="save-btn" style="margin-top:10px;">重试</button>
                     </div>
                 `;
+                const retry = document.getElementById('btnLocalRetry');
+                if (retry) retry.addEventListener('click', () => loadLocalStatus());
             }
         }
-        
         function closeSkillDetail() {
             document.getElementById('skillDetail').classList.remove('show');
         }
