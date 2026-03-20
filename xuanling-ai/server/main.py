@@ -861,9 +861,17 @@ if STATIC_DIR.exists():
 # ============== 重启 API ==============
 
 @app.post("/api/restart")
-def restart_server():
+def restart_server(request: Request):
     """重启后端服务"""
     import subprocess
+    import sys
+    # 可选: 简易鉴权，设置环境变量 ADMIN_TOKEN 时要求请求头 X-Admin-Token 匹配
+    admin_token = os.getenv("ADMIN_TOKEN", "")
+    if admin_token:
+        req_token = request.headers.get("X-Admin-Token", "")
+        if req_token != admin_token:
+            raise HTTPException(status_code=401, detail="未授权")
+
     import sys
     
     def restart_background():
