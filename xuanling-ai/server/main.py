@@ -27,6 +27,10 @@ logger = logging.getLogger("玄灵AI")
 # ============== 获取静态文件路径 ==============
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
+# 工作区根目录（/root/.openclaw/workspace）
+WORKSPACE_ROOT = BASE_DIR.resolve().parents[2]
+AGENTS_DIR = WORKSPACE_ROOT / "agents"
+AGENTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ============== 配置 ==============
 # 从环境变量读取，生产环境请配置
@@ -179,6 +183,22 @@ class Memory(BaseModel):
     tags: List[str] = []
     project_id: Optional[int] = None
     importance: int = 1
+
+# 子代理与文件写入请求模型
+class AgentCreate(BaseModel):
+    name: str
+    description: Optional[str] = ""
+
+class AgentUpdate(BaseModel):
+    description: Optional[str] = None
+    status: Optional[str] = None
+
+class AgentMemoryCreate(BaseModel):
+    title: str
+    content: Optional[str] = ""
+
+class FileSave(BaseModel):
+    content: str = ""
 
 # ============== 真实 AI 对接 (MiniMax) ==============
 
@@ -345,6 +365,16 @@ def create_project(project: Project):
         }
         _data["projects"].append(new_project)
         save_data(_data)
+    
+    # 在工作区自动创建项目文件夹与 README
+    proj_dir = WORKSPACE_ROOT / project.name
+    try:
+        proj_dir.mkdir(parents=True, exist_ok=True)
+        readme = proj_dir / "README.md"
+        if not readme.exists():
+            readme.write_text(f"# {project.name}\n\n{project.description or ''}\n\n创建时间: {datetime.now().isoformat()}\n", encoding="utf-8")
+    except Exception as e:
+        logger.error(f"初始化项目目录失败: {e}")
     
     return new_project
 
@@ -540,6 +570,20 @@ def health_check():
 def health_compat():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
+# 后端日志尾部输出（用于“本地运行状态”监控）
+@app.get("/api/logs")
+def tail_logs(lines: int = 80):
+    log_path = Path('/tmp/xuanling.log')
+    if not log_path.exists():
+        return HTMLResponse("无日志文件")
+    try:
+        content = log_path.read_text(encoding='utf-8')
+        # 取末尾 N 行
+        parts = content.splitlines()[-lines:]
+        return HTMLResponse("\n".join(parts))
+    except Exception as e:
+        return HTMLResponse(f"读取日志失败: {e}")
+
 # 兼容 /config GET/POST
 @app.get("/config")
 def get_config():
@@ -627,26 +671,41 @@ _next_agent_id = 4
 _agent_memories = {1: {}, 2: {}, 3: {}}
 _agent_tasks = {1: [], 2: [], 3: []}
 
+# 子代理持久化：在 /workspace/agents/{id}-{name}/ 目录下维护 memory.json 与 tasks.json
+
+def _agent_dir(agent_id: int, name: str) -> Path:
+    safe_name = ''.join(c for c in name if c.isalnum() or c in ('-','_'))[:50] or f"agent{agent_id}"
+    d = AGENTS_DIR / f"{agent_id}-{safe_name}"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+def _load_json(path: Path, default):
+    try:
+        if path.exists():
+            return json.load(path.open('r', encoding='utf-8'))
+    except Exception:
+        pass
+    return default
+
+def _save_json(path: Path, data):
+    try:
+        json.dump(data, path.open('w', encoding='utf-8'), ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"写入 {path} 失败: {e}")
+
 @app.get("/agents")
 def list_agents():
     return {"agents": list(_agents_state.values())}
 
 @app.post("/agents")
-def create_agent(request: Request):
+def create_agent(payload: AgentCreate):
     global _next_agent_id
-    payload = request.json() if hasattr(request, 'json') else {}
-    try:
-        payload = json.loads(request.body().decode())
-    except Exception:
-        payload = {}
-    name = payload.get("name")
-    if not name:
+    if not payload.name:
         raise HTTPException(status_code=400, detail="子代理名称不能为空")
-    desc = payload.get("description", "")
     agent = {
         "id": _next_agent_id,
-        "name": name,
-        "description": desc,
+        "name": payload.name,
+        "description": payload.description or "",
         "status": "idle",
         "tasks_count": 0,
         "success_rate": 1.0
@@ -654,22 +713,27 @@ def create_agent(request: Request):
     _agents_state[_next_agent_id] = agent
     _agent_memories[_next_agent_id] = {}
     _agent_tasks[_next_agent_id] = []
+    # 初始化记忆与任务持久化文件
+    d = _agent_dir(_next_agent_id, payload.name)
+    _save_json(d / 'memory.json', {})
+    _save_json(d / 'tasks.json', [])
     _next_agent_id += 1
     return {"status": "ok", "agent": agent}
 
 @app.put("/agents/{agent_id}")
-def update_agent(agent_id: int, request: Request):
-    try:
-        payload = json.loads(request.body().decode())
-    except Exception:
-        payload = {}
+def update_agent(agent_id: int, payload: AgentUpdate):
     agent = _agents_state.get(agent_id)
     if not agent:
         raise HTTPException(status_code=404, detail="子代理不存在")
-    if "description" in payload:
-        agent["description"] = payload["description"]
-    if "status" in payload:
-        agent["status"] = payload["status"]
+    if payload.description is not None:
+        agent["description"] = payload.description
+    if payload.status is not None:
+        agent["status"] = payload.status
+    # 追加一条任务历史（状态变更视为任务）
+    d = _agent_dir(agent_id, agent["name"])
+    tasks = _load_json(d / 'tasks.json', [])
+    tasks.append({"ts": datetime.now().isoformat(), "task": "status_update", "status": agent["status"]})
+    _save_json(d / 'tasks.json', tasks)
     return {"status": "ok", "agent": agent}
 
 @app.delete("/agents/{agent_id}")
@@ -684,30 +748,40 @@ def delete_agent(agent_id: int):
 @app.get("/agents/{agent_id}/memory")
 def get_agent_memory(agent_id: int):
     mems = _agent_memories.get(agent_id)
-    if mems is None:
+    agent = _agents_state.get(agent_id)
+    if mems is None or not agent:
         raise HTTPException(status_code=404, detail="子代理不存在")
-    return {"memories": mems}
+    # 合并内存态与持久化文件
+    d = _agent_dir(agent_id, agent["name"])
+    file_mems = _load_json(d / 'memory.json', {})
+    merged = {**file_mems, **mems}
+    return {"memories": merged}
 
 @app.post("/agents/{agent_id}/memory")
-def add_agent_memory(agent_id: int, request: Request):
-    try:
-        payload = json.loads(request.body().decode())
-    except Exception:
-        payload = {}
-    title = payload.get("title")
-    if not title:
+def add_agent_memory(agent_id: int, payload: AgentMemoryCreate):
+    if not payload.title:
         raise HTTPException(status_code=400, detail="记忆标题不能为空")
-    content = payload.get("content", "")
+    agent = _agents_state.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="子代理不存在")
+    # 写入内存并持久化
     mems = _agent_memories.setdefault(agent_id, {})
-    mem_id = max(mems.keys(), default=0) + 1 if mems else 1
-    mems[mem_id] = {"id": mem_id, "title": title, "content": content}
-    return {"status": "ok", "memory": mems[mem_id]}
+    mem_id = (max(mems.keys()) + 1) if mems else 1
+    rec = {"id": mem_id, "title": payload.title, "content": payload.content or ""}
+    mems[mem_id] = rec
+    d = _agent_dir(agent_id, agent["name"])
+    file_mems = _load_json(d / 'memory.json', {})
+    file_mems[str(mem_id)] = rec
+    _save_json(d / 'memory.json', file_mems)
+    return {"status": "ok", "memory": rec}
 
 @app.get("/agents/{agent_id}/tasks")
 def get_agent_tasks(agent_id: int):
-    tasks = _agent_tasks.get(agent_id)
-    if tasks is None:
+    agent = _agents_state.get(agent_id)
+    if not agent:
         raise HTTPException(status_code=404, detail="子代理不存在")
+    d = _agent_dir(agent_id, agent["name"])
+    tasks = _load_json(d / 'tasks.json', [])
     return {"tasks": tasks}
 
 # 兼容 /chat/json
@@ -758,23 +832,11 @@ def get_project_file(project_name: str, file_path: str):
     return {"content": content, "status": "ok"}
 
 @app.put("/project-manager/projects/{project_name}/files/{file_path:path}")
-def update_project_file(project_name: str, file_path: str, request: Request):
+def update_project_file(project_name: str, file_path: str, payload: FileSave):
     target = _safe_project_paths(project_name, file_path)
-    # 自动创建父目录
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
-        body = request.json() if hasattr(request, 'json') else None
-    except Exception:
-        body = None
-    if not body:
-        try:
-            import json as _json
-            body = _json.loads(request.body().decode())
-        except Exception:
-            body = {}
-    content = body.get("content", "")
-    try:
-        target.write_text(content, encoding="utf-8")
+        target.write_text(payload.content or "", encoding="utf-8")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"写入失败: {e}")
     return {"status": "ok", "message": "文件已保存"}
