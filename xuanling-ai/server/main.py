@@ -112,6 +112,12 @@ if not _data["projects"]:
     ]
     _data["next_ids"]["project"] = 3
 
+# 确保首次启动时默认项目也持久化到 data.json
+try:
+    save_data(_data)
+except Exception as _e:
+    logger.error(f"初始化持久化失败: {_e}")
+
 if not _data["memories"]:
     _data["memories"] = [
         {"id": 1, "title": "主人称呼偏好", "content": "喜欢被称呼为老板", "tags": ["个人"], "importance": 5, "project_id": None},
