@@ -262,9 +262,18 @@ async def call_minimax_ai(user_message: str) -> str:
             }
             # 兼容不同 API 格式
             if "minimax" in api_url:
-                endpoint = f"{api_url}/text/chatcompletion_v2"
+                endpoint = f"%s/text/chatcompletion_v2" % api_url
+                payload = {
+                    "model": model,
+                    "bot_setting": [{"bot_name": "玄灵AI", "content": CAPABILITIES_TEXT}],
+                    "messages": [
+                        {"role": "user", "content": user_message}
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 500
+                }
             else:
-                endpoint = f"{api_url}/chat/completions"
+                endpoint = f"%s/chat/completions" % api_url
             
             async with session.post(
                 endpoint,
@@ -383,6 +392,10 @@ async def chat(request: ChatRequest):
         # 调用 AI
         response = await call_minimax_ai(request.message)
         logger.info(f"AI 回复: {response[:50]}...")
+        override = _should_override_response(request.message, response)
+        if override:
+            logger.info("AI 回复被能力兜底纠偏覆盖")
+            response = override
         return ChatResponse(response=response)
     except Exception as e:
         logger.error(f"对话处理失败: {e}")
@@ -903,6 +916,12 @@ if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     logger.info(f"静态文件目录: {STATIC_DIR}")
 
+
+
+@app.get('/api/capabilities')
+def get_capabilities():
+    """返回内置能力清单（供前端展示）"""
+    return {"capabilities": CAPABILITIES_TEXT}
 # ============== 重启 API ==============
 
 @app.post("/api/restart")
@@ -938,3 +957,36 @@ if __name__ == "__main__":
     logger.info("启动玄灵AI后端服务...")
     logger.info(f"静态文件目录: {STATIC_DIR}")
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+def _should_override_response(user_message: str, model_reply: str) -> str | None:
+    """在模型跑偏时基于内置能力兜底纠偏。返回替代文本或 None。"""
+    if not user_message:
+        return None
+    um = user_message
+    mr = (model_reply or '').strip()
+    ask_proj = ('项目管理' in um) or ('项目' in um and any(k in um for k in ['功能','做什么','用途','能做','有什么用']))
+    deny_signals = any(k in mr for k in ['并不具备项目管理功能','没有项目管理','没有项目管理模块'])
+    off_topic = '农林牧副渔' in mr
+    if ask_proj and (deny_signals or off_topic or not mr):
+        return ("我的项目管理功能是内置且可直接使用的，主要包括：
+
+"
+                "- 增删改查项目：GET/POST/PUT/DELETE /projects，支持进度(progress)、状态(status) 等更新
+"
+                "- 控制台操作：侧边栏进入‘项目管理’，浏览项目卡片、打开项目详情
+"
+                "- 项目文件：/project-manager/projects/{name}/files/{path} 可读取/保存项目内文件（含路径安全校验）
+"
+                "- 关联能力：可与记忆系统(/api/memory)与子代理(/agents)协作，对任务/笔记/自动化联动
+
+"
+                "如果你告诉我项目名称与需求，我可以：
+"
+                "1) 立即创建一个项目；
+"
+                "2) 为它添加进度与状态；
+"
+                "3) 初始化项目文件/README；
+"
+                "4) 在控制台中高亮显示便于后续操作。")
+    return None
