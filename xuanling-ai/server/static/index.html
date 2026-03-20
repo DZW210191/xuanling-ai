@@ -152,6 +152,7 @@
             <div class="nav-item" data-panel="skills" onclick="switchTo('skills')"><span>🛠️</span> 技能商店</div>
             <div class="nav-item" data-panel="settings" onclick="switchTo('settings')"><span>⚙️</span> 系统设置</div>
             <div class="nav-item" data-panel="local" onclick="switchTo('local')"><span>💻</span> 本地运行</div>
+            <div class="nav-item" data-panel="channels" onclick="switchTo('channels')"><span>📡</span> 频道配置</div>
         </div>
         
         <div class="main">
@@ -409,7 +410,27 @@
                 <button class="modal-btn cancel" style="background:#ef4444;" onclick="deleteAgent()">删除代理</button>
                 <button class="modal-btn cancel" onclick="closeAgentDetail()">关闭</button>
                 <button class="modal-btn confirm" onclick="saveAgent()">保存</button>
+            
+            <!-- 频道与工具面板 -->
+            <div class="panel" id="channels">
+                <h2 class="panel-title">📡 频道配置</h2>
+                <div id="channelsList" style="margin-bottom:10px;color:#a0aec0;">加载中...</div>
+                <div class="form-group"><label class="form-label">新建/更新频道</label>
+                    <input id="chanId" class="form-input" placeholder="id(唯一) - 如 feishu-main">
+                    <input id="chanName" class="form-input" placeholder="名称 - 飞书主群">
+                    <input id="chanProvider" class="form-input" placeholder="提供商 - feishu|wecom|slack|discord|telegram|webhook">
+                    <input id="chanWebhook" class="form-input" placeholder="Webhook URL (可选)">
+                    <input id="chanTarget" class="form-input" placeholder="默认目标(可选)">
+                    <input id="chanToken" type="password" class="form-input" placeholder="Token(仅本机保存，不落盘)">
+                    <button class="save-btn" onclick="saveChannel()">保存频道</button>
+                </div>
+                <div class="form-group"><label class="form-label">测试发送</label>
+                    <input id="chanTestId" class="form-input" placeholder="频道 id">
+                    <input id="chanTestText" class="form-input" placeholder="文本">
+                    <button class="save-btn" onclick="testChannelSend()">发送测试</button>
+                </div>
             </div>
+</div>
         </div>
     </div>
     
@@ -430,7 +451,7 @@
             if (panelId === 'memory') loadMemories();
             if (panelId === 'settings') loadSettings();
             if (panelId === 'skills') loadSkills();
-            if (panelId === 'local') loadLocalStatus();
+            if (panelId === 'local') loadLocalStatus(); if (panelId === 'channels') loadChannels();
         }
         let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
         
@@ -515,7 +536,7 @@
                     if (panelId === 'memory') loadMemories();
                     if (panelId === 'settings') loadSettings();
                     if (panelId === 'skills') loadSkills();
-                    if (panelId === 'local') loadLocalStatus();
+                    if (panelId === 'local') loadLocalStatus(); if (panelId === 'channels') loadChannels();
                 });
             });
         });
@@ -1472,7 +1493,40 @@ curl http://127.0.0.1:8000/api/logs</pre>
         if (savedSettings.modelName) document.getElementById('modelName').value = savedSettings.modelName;
         
         // 初始化 - 立即执行
-        loadProjects(); loadMemories();
-    </script>
+        loadProjects(); loadMemories(); loadChannels();
+    
+        // 频道管理
+        async function loadChannels() {
+            const list = document.getElementById('channelsList');
+            if (!list) return;
+            try {
+                const resp = await fetch(API_BASE + '/api/channels');
+                const data = await resp.json();
+                const arr = data.channels || [];
+                list.innerHTML = arr.length ? arr.map(c => `• ${c.id} [${c.provider}] ${c.name} ${c.webhook_url?'(webhook)':''}`).join('<br>') : '暂无频道';
+            } catch(e){ list.innerHTML = '加载失败: '+e.message; }
+        }
+        async function saveChannel(){
+            const body = {
+                id: document.getElementById('chanId').value.trim(),
+                name: document.getElementById('chanName').value.trim(),
+                provider: document.getElementById('chanProvider').value.trim(),
+                webhook_url: document.getElementById('chanWebhook').value.trim()||null,
+                default_target: document.getElementById('chanTarget').value.trim()||null,
+                token: document.getElementById('chanToken').value
+            };
+            const resp = await fetch(API_BASE + '/api/channels', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+            const data = await resp.json();
+            alert('保存成功'); loadChannels();
+        }
+        async function testChannelSend(){
+            const id = document.getElementById('chanTestId').value.trim();
+            const text = document.getElementById('chanTestText').value.trim()||'hello';
+            const resp = await fetch(API_BASE + '/api/channels/'+encodeURIComponent(id)+'/test', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text})});
+            const data = await resp.json();
+            alert('发送结果: '+JSON.stringify(data));
+        }
+
+</script>
 </body>
 </html>
