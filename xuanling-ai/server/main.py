@@ -27,9 +27,11 @@ logger = logging.getLogger("玄灵AI")
 # ============== 获取静态文件路径 ==============
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
-# 工作区根目录（/root/.openclaw/workspace）
-WORKSPACE_ROOT = BASE_DIR.resolve().parents[2]
-AGENTS_DIR = WORKSPACE_ROOT / "agents"
+# 应用内数据根目录（存放项目与子代理数据）
+APP_DATA_ROOT = BASE_DIR / "appdata"
+PROJECTS_DIR = APP_DATA_ROOT / "projects"
+AGENTS_DIR = APP_DATA_ROOT / "agents"
+PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
 AGENTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ============== 配置 ==============
@@ -367,7 +369,7 @@ def create_project(project: Project):
         save_data(_data)
     
     # 在工作区自动创建项目文件夹与 README
-    proj_dir = WORKSPACE_ROOT / project.name
+    proj_dir = PROJECTS_DIR / project.name
     try:
         proj_dir.mkdir(parents=True, exist_ok=True)
         readme = proj_dir / "README.md"
@@ -639,8 +641,7 @@ def get_projects_compat():
 def get_project_detail(project_name: str):
     # 安全列出项目目录下文件（限定到 server/ 静态根的上级工作区）
     # 这里示例使用 workspace 根目录的同名文件夹作为项目根
-    workspace_root = Path(__file__).resolve().parents[2]  # /root/.openclaw/workspace
-    project_root = workspace_root / project_name
+    project_root = PROJECTS_DIR / project_name
     files = []
     if project_root.exists() and project_root.is_dir():
         for path in project_root.rglob('*'):
@@ -809,8 +810,7 @@ def get_bg_tasks():
 
 # 兼容 /project-manager/projects/{name}/files/{path}
 def _safe_project_paths(project_name: str, file_path: str) -> Path:
-    workspace_root = Path(__file__).resolve().parents[2]
-    project_root = (workspace_root / project_name).resolve()
+    project_root = (PROJECTS_DIR / project_name).resolve()
     target = (project_root / file_path).resolve()
     if not str(target).startswith(str(project_root)):
         raise HTTPException(status_code=400, detail="非法路径")
