@@ -210,6 +210,27 @@ class FileSave(BaseModel):
 
 # ============== 真实 AI 对接 (MiniMax) ==============
 
+CAPABILITIES_TEXT = r"""
+你是玄灵AI，具备以下内置能力（已实现的真实功能）：
+1) 项目管理：
+   - 接口：GET/POST/PUT/DELETE /projects（创建/更新进度与状态/删除）
+   - 界面：控制台侧边栏“项目管理”，可浏览项目卡片
+   - 文件：/project-manager/projects/{name}/files/{path} 可读写项目文件（含路径安全校验）
+2) 记忆系统：
+   - 接口：GET/POST/DELETE /api/memory（兼容 /memory）
+   - 用于记录偏好、重要信息与项目关联笔记
+3) 子代理管理：
+   - 接口：GET/POST/PUT/DELETE /agents；子路由 /agents/{id}/memory, /agents/{id}/tasks
+   - 用于管理自动化子任务与其记忆/历史
+4) 对话：
+   - 接口：POST /api/chat（接入 MiniMax；无 Key 时走模拟回复）
+5) 设置/模型：
+   - 接口：GET/POST /api/settings、/config、/models 相关
+6) 监控与运维：
+   - 接口：/api/health、/api/monitor、/api/logs、POST /api/restart（可选令牌 X-Admin-Token）
+请基于上述真实能力回答用户，不要声称“没有项目管理模块”。当被问及“项目管理能做什么”，应说明增删改查项目、进度状态管理、项目文件读写与控制台导航等。
+"""
+
 async def call_minimax_ai(user_message: str) -> str:
     """调用 MiniMax AI API - 使用保存的设置"""
     # 优先使用保存的设置，否则回退到环境变量
@@ -227,7 +248,7 @@ async def call_minimax_ai(user_message: str) -> str:
             payload = {
                 "model": model,
                 "messages": [
-                    {"role": "system", "content": "你是玄灵AI，一个友好、聪明的AI助手。"},
+                    {"role": "system", "content": CAPABILITIES_TEXT},
                     {"role": "user", "content": user_message}
                 ],
                 "temperature": 0.7,
@@ -282,6 +303,30 @@ async def mock_ai_response(message: str) -> str:
     msg = message.lower()
     
     # 智能关键词匹配
+    if ("项目管理" in message) or ("项目" in message and ("功能" in message or "做什么" in message or "用途" in message)):
+        return (
+            "我的项目管理功能是内置且可直接使用的，主要包括：
+
+"
+            "- 增删改查项目：GET/POST/PUT/DELETE /projects，支持进度(progress)、状态(status) 等更新
+"
+            "- 控制台操作：侧边栏进入‘项目管理’，浏览项目卡片、打开项目详情
+"
+            "- 项目文件：/project-manager/projects/{name}/files/{path} 可读取/保存项目内文件（含路径安全校验）
+"
+            "- 关联能力：可与记忆系统(/api/memory)与子代理(/agents)协作，对任务/笔记/自动化联动
+
+"
+            "如果你告诉我项目名称与需求，我可以：
+"
+            "1) 立即创建一个项目；
+"
+            "2) 为它添加进度与状态；
+"
+            "3) 初始化项目文件/README；
+"
+            "4) 在控制台中高亮显示便于后续操作。"
+        )
     if "你好" in msg or "hi" in msg or "hello" in msg:
         return "你好！我是玄灵AI，很高兴见到你！有什么我可以帮你的吗？"
     elif "项目" in msg:
