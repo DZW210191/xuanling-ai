@@ -208,6 +208,134 @@ class AgentMemoryCreate(BaseModel):
 class FileSave(BaseModel):
     content: str = ""
 
+
+# ============== 通道与工具（对齐 OpenClaw 思路的最小实现） ==============
+from typing import Dict, Any
+
+CHANS_FILE = "channels.json"
+
+class Channel(BaseModel):
+    id: str
+    name: str
+    provider: str  # feishu|wecom|slack|discord|telegram|webhook
+    enabled: bool = True
+    webhook_url: Optional[str] = None  # 通用 webhook 优先
+    default_target: Optional[str] = None
+    token: Optional[str] = None  # 仅内存保存，不落盘
+
+# 进程内保存 token，文件仅保存非敏感
+_channel_tokens: Dict[str, str] = {}
+
+def _load_channels() -> list[dict]:
+    try:
+        with open(CHANS_FILE, 'r', encoding='utf-8') as f:
+            arr = json.load(f)
+            return arr if isinstance(arr, list) else []
+    except FileNotFoundError:
+        return []
+    except Exception as e:
+        logger.error(f"加载 {CHANS_FILE} 失败: {e}")
+        return []
+
+def _save_channels(chans: list[dict]):
+    # 只保存非敏感字段
+    scrubs = []
+    for c in chans:
+        d = dict(c)
+        d.pop('token', None)
+        scrubs.append(d)
+    with open(CHANS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(scrubs, f, ensure_ascii=False, indent=2)
+
+_channels = _load_channels()
+
+@app.get('/api/channels')
+def list_channels():
+    # 返回时不带 token
+    return {"channels": _channels}
+
+@app.post('/api/channels')
+def upsert_channel(ch: Channel):
+    # 记录 token 到内存
+    if ch.token:
+        _channel_tokens[ch.id] = ch.token
+    # 更新或插入
+    exist = None
+    for i,c in enumerate(_channels):
+        if c.get('id') == ch.id:
+            exist = i; break
+    record = {
+        "id": ch.id, "name": ch.name, "provider": ch.provider,
+        "enabled": ch.enabled, "webhook_url": ch.webhook_url,
+        "default_target": ch.default_target
+    }
+    if exist is None:
+        _channels.append(record)
+    else:
+        _channels[exist] = record
+    _save_channels(_channels)
+    return {"status":"ok","channel":record}
+
+@app.delete('/api/channels/{chan_id}')
+def delete_channel(chan_id: str):
+    global _channels
+    _channels = [c for c in _channels if c.get('id') != chan_id]
+    _channel_tokens.pop(chan_id, None)
+    _save_channels(_channels)
+    return {"status":"ok"}
+
+@app.post('/api/channels/{chan_id}/test')
+def test_channel(chan_id: str, payload: dict):
+    """测试发送：优先调用 webhook_url，以 JSON 发送 {text, target?}，失败则模拟。"""
+    msg = payload.get('text') or 'hello from 玄灵AI'
+    target = payload.get('target')
+    for c in _channels:
+        if c.get('id') == chan_id:
+            url = c.get('webhook_url')
+            if url:
+                try:
+                    import requests
+                    r = requests.post(url, json={"text": msg, "target": target or c.get('default_target')}, timeout=5)
+                    return {"status":"ok","code": r.status_code}
+                except Exception as e:
+                    logger.error(f"测试发送失败: {e}")
+                    break
+            # 无 webhook 或失败，走模拟
+            logger.info(f"[SIM_SEND] provider={c.get('provider')} target={target or c.get('default_target')} text={msg}")
+            return {"status":"ok","simulated": True}
+    raise HTTPException(status_code=404, detail="channel not found")
+
+# —— 工具最小实现：将后端已实现能力以工具形式暴露 ——
+class ToolRun(BaseModel):
+    name: str
+    args: dict = {}
+
+_TOOLS: Dict[str, Dict[str, Any]] = {
+    "projects.create": {"desc": "创建项目", "schema": {"name":"str","description":"str?","icon":"str?"}},
+    "projects.update": {"desc": "更新项目", "schema": {"id":"int","progress":"int?","status":"str?"}},
+    "memory.create":   {"desc": "新增记忆", "schema": {"title":"str","content":"str?","tags":"list?","importance":"int?"}},
+}
+
+@app.get('/api/tools')
+def list_tools():
+    return {"tools": [{"name": k, **v} for k,v in _TOOLS.items()]}
+
+@app.post('/api/tools/run')
+def run_tool(run: ToolRun):
+    n = run.name
+    a = run.args or {}
+    if n == 'projects.create':
+        proj = Project(name=a.get('name'), description=a.get('description'), icon=a.get('icon'))
+        return create_project(proj)
+    if n == 'projects.update':
+        pid = int(a.get('id'))
+        proj = Project(progress=a.get('progress'), status=a.get('status'))
+        return update_project(pid, proj)
+    if n == 'memory.create':
+        mem = Memory(title=a.get('title'), content=a.get('content') or '', tags=a.get('tags') or [], importance=int(a.get('importance') or 1))
+        return create_memory(mem)
+    raise HTTPException(status_code=400, detail='unknown tool')
+
 # ============== 真实 AI 对接 (MiniMax) ==============
 
 CAPABILITIES_TEXT = r"""
