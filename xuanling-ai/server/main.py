@@ -550,17 +550,17 @@ def get_config():
     }
 
 @app.post("/config")
-def save_config(request: Request):
+async def save_config(request: Request):
     # 将 /config 保存兼容到 /api/settings
     try:
-        body = json.loads(request.body().decode()) if hasattr(request, 'body') else {}
+        body = await request.json()
     except Exception:
         body = {}
+    global app_settings
     model = body.get('model') or app_settings.get('model')
     api_url = body.get('api_url') or body.get('apiUrl') or app_settings.get('apiUrl')
     api_key = body.get('api_key') or body.get('apiKey')
     # 更新内存配置并落盘非敏感
-    global app_settings
     app_settings = {"model": model, "apiUrl": api_url, "apiKey": api_key or app_settings.get('apiKey', '')}
     save_settings_to_file(app_settings)
     return {"status": "ok", "message": "配置已保存"}
@@ -593,7 +593,27 @@ def get_projects_compat():
 # 兼容 /project-manager/projects/{name}
 @app.get("/project-manager/projects/{project_name}")
 def get_project_detail(project_name: str):
-    return {"name": project_name, "description": "", "files": [], "status": "ok"}
+    # 安全列出项目目录下文件（限定到 server/ 静态根的上级工作区）
+    # 这里示例使用 workspace 根目录的同名文件夹作为项目根
+    workspace_root = Path(__file__).resolve().parents[2]  # /root/.openclaw/workspace
+    project_root = workspace_root / project_name
+    files = []
+    if project_root.exists() and project_root.is_dir():
+        for path in project_root.rglob('*'):
+            if path.is_file():
+                # 只统计合理大小的文本/代码文件
+                try:
+                    rel = path.relative_to(project_root).as_posix()
+                    size = path.stat().st_size
+                    # 跳过敏感/隐藏目录和大文件
+                    if any(part.startswith('.') for part in path.parts):
+                        continue
+                    if size > 2 * 1024 * 1024:  # >2MB 不展示
+                        continue
+                    files.append({"path": rel, "size": size})
+                except Exception:
+                    continue
+    return {"project": {"name": project_name}, "files": files, "status": "ok"}
 
 
 # 兼容 /agents
@@ -714,15 +734,50 @@ def get_bg_tasks():
     return {"tasks": []}
 
 # 兼容 /project-manager/projects/{name}/files/{path}
+def _safe_project_paths(project_name: str, file_path: str) -> Path:
+    workspace_root = Path(__file__).resolve().parents[2]
+    project_root = (workspace_root / project_name).resolve()
+    target = (project_root / file_path).resolve()
+    if not str(target).startswith(str(project_root)):
+        raise HTTPException(status_code=400, detail="非法路径")
+    return target
+
 @app.get("/project-manager/projects/{project_name}/files/{file_path:path}")
 def get_project_file(project_name: str, file_path: str):
-    # 明确返回未实现，避免假成功
-    raise HTTPException(status_code=404, detail="文件读取未实现：当前版本不支持该操作")
+    target = _safe_project_paths(project_name, file_path)
+    if not target.exists() or not target.is_file():
+        raise HTTPException(status_code=404, detail="文件不存在")
+    # 限制读取 1MB 以内的文本文件
+    if target.stat().st_size > 1024 * 1024:
+        raise HTTPException(status_code=413, detail="文件过大，无法预览")
+    try:
+        # 以 utf-8 读取，失败则返回提示
+        content = target.read_text(encoding="utf-8")
+    except Exception:
+        raise HTTPException(status_code=415, detail="非文本文件，无法预览")
+    return {"content": content, "status": "ok"}
 
 @app.put("/project-manager/projects/{project_name}/files/{file_path:path}")
 def update_project_file(project_name: str, file_path: str, request: Request):
-    # 明确返回未实现，避免假成功
-    raise HTTPException(status_code=501, detail="文件保存未实现：当前版本不支持该操作")
+    target = _safe_project_paths(project_name, file_path)
+    # 自动创建父目录
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        body = request.json() if hasattr(request, 'json') else None
+    except Exception:
+        body = None
+    if not body:
+        try:
+            import json as _json
+            body = _json.loads(request.body().decode())
+        except Exception:
+            body = {}
+    content = body.get("content", "")
+    try:
+        target.write_text(content, encoding="utf-8")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"写入失败: {e}")
+    return {"status": "ok", "message": "文件已保存"}
 
 @app.delete("/project-manager/projects/{project_name}")
 def delete_project_file(project_name: str):

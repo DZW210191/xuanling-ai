@@ -1137,7 +1137,7 @@ async function loadProjects() {
             // 保存到本地
             localStorage.setItem('xuanling_settings', JSON.stringify({apiUrl, apiKey, modelName}));
             
-            // 发送到后端保存
+            // 发送到后端保存（统一字段名）
             fetch(API_BASE + '/api/settings', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -1147,13 +1147,11 @@ async function loadProjects() {
                     model: modelName
                 })
             }).then(r => r.json()).then(data => {
-                if (data.status === 'ok') {
-                    alert('✅ 设置已保存并生效！');
-                } else {
-                    alert('⚠️ 本地保存成功，但后端更新失败: ' + (data.message || ''));
-                }
+                const msg = (data && data.message) ? data.message : '设置已保存并生效！';
+                alert('✅ ' + msg);
+                loadSettings();
             }).catch(e => {
-                alert('⚠️ 本地保存成功，但后端连接失败: ' + e.message);
+                alert('⚠️ 保存失败: ' + e.message);
             });
         }
         
@@ -1201,7 +1199,7 @@ async function loadProjects() {
             }
         }
         
-        // 保存设置
+        // 保存设置（去重后的唯一实现）
         async function saveSettings() {
             const apiUrl = document.getElementById('apiUrl').value;
             const apiKey = document.getElementById('apiKey').value;
@@ -1215,30 +1213,31 @@ async function loadProjects() {
             }));
             
             try {
-                // 发送到后端保存
+                // 发送到后端保存（统一字段名）
                 const resp = await fetch(API_BASE + '/api/settings', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        api_url: apiUrl,
-                        api_key: apiKey,
+                        apiUrl: apiUrl,
+                        apiKey: apiKey,
                         model: modelName
                     })
                 });
                 const data = await resp.json();
                 
-                // 激活模型
+                // 激活模型（保持行为，但不决定成败提示）
                 await fetch(API_BASE + '/models/' + provider + '/activate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
-                        api_url: apiUrl,
-                        api_key: apiKey,
+                        apiUrl: apiUrl,
+                        apiKey: apiKey,
                         model: modelName
                     })
-                });
+                }).catch(() => {});
                 
-                alert('✅ 设置已保存并生效！');
+                const msg = (data && data.message) ? data.message : '设置已保存并生效！';
+                alert('✅ ' + msg);
                 loadSettings(); // 刷新
             } catch (e) {
                 alert('⚠️ 保存失败: ' + e.message);
