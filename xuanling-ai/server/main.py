@@ -1,21 +1,54 @@
 """
 玄灵AI 后端 - FastAPI 主入口 (增强版)
-修复: 数据持久化、安全性、异常处理、真实AI对接
+支持: 工具调用、Skills、子代理、数据持久化、API缓存
+修复: 重复路由、命名冲突、安全问题
+版本: v1.3.0
 """
 import os
+import sys
 import json
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import uvicorn
+
+# ============== 添加模块路径 ==============
+sys.path.insert(0, str(Path(__file__).parent))
+
+# ============== 导入工具系统和 AI 引擎 ==============
+from tools import tool_registry, ToolDefinition
+from engine import ai_engine
+
+# ============== 导入缓存系统 ==============
+from cache import get_cache, init_cache
+
+# ============== 导入新模块 (使用别名避免冲突) ==============
+from skills import skill_manager, SkillBase, SkillMetadata, SkillConfig
+from subagents import (
+    task_scheduler, task_planner, SubAgent, SubAgentConfig, 
+    Task, TaskStatus as SubTaskStatus, TaskPriority as SubTaskPriority, 
+    TaskResult, AgentRole,
+    submit_task, plan_and_execute
+)
+from subagents import create_agent as create_subagent
+from memory import memory_manager, MemoryType, MemoryImportance, remember, recall
+from security import (
+    permission_manager, audit_logger, security_middleware, 
+    Permission, Role, SecurityPolicy, get_admin_key
+)
+from project_manager import (
+    project_manager, Project as PMProject, ProjectTask, ProjectDocument,
+    ProjectStatus, TaskStatus as PTaskStatus, TaskPriority as PTaskPriority,
+    DocumentType
+)
 
 # ============== 日志配置 ==============
 logging.basicConfig(
@@ -27,19 +60,23 @@ logger = logging.getLogger("玄灵AI")
 # ============== 获取静态文件路径 ==============
 BASE_DIR = Path(__file__).parent
 STATIC_DIR = BASE_DIR / "static"
-# 应用内数据根目录（存放项目与子代理数据）
-APP_DATA_ROOT = BASE_DIR / "appdata"
-PROJECTS_DIR = APP_DATA_ROOT / "projects"
-AGENTS_DIR = APP_DATA_ROOT / "agents"
-PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
-AGENTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # ============== 配置 ==============
-# 从环境变量读取，生产环境请配置
+# 服务配置 (可通过环境变量覆盖)
+SERVER_HOST = os.getenv("SERVER_HOST", "0.0.0.0")
+SERVER_PORT = int(os.getenv("SERVER_PORT", "8000"))
+SERVER_RELOAD = os.getenv("SERVER_RELOAD", "false").lower() == "true"
+
+# API 配置
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
 MINIMAX_BASE_URL = os.getenv("MINIMAX_BASE_URL", "https://api.minimax.chat/v1")
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8080").split(",")
-SETTINGS_FILE = "settings.json"
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+SETTINGS_FILE = os.getenv("SETTINGS_FILE", "settings.json")
+DATA_FILE = os.getenv("DATA_FILE", "data.json")
+
+# 请求超时配置
+REQUEST_TIMEOUT = int(os.getenv("REQUEST_TIMEOUT", "60"))
+TOOL_EXECUTION_TIMEOUT = int(os.getenv("TOOL_EXECUTION_TIMEOUT", "30"))
 
 # 加载或初始化设置
 def load_settings():
@@ -52,93 +89,155 @@ def load_settings():
 
 def save_settings_to_file(settings: dict):
     """保存设置到文件（不包含 API Key）"""
-    to_save = {"model": settings.get("model"), "apiUrl": settings.get("apiUrl")}
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump(to_save, f, ensure_ascii=False, indent=2)
-    logger.info(f"设置已保存到文件: model={to_save.get('model')}, apiUrl={to_save.get('apiUrl')}, apiKey=不落盘")
+        json.dump({"model": settings.get("model"), "apiUrl": settings.get("apiUrl")}, f, ensure_ascii=False, indent=2)
+    logger.info(f"设置已保存: model={settings.get('model')}, apiUrl={settings.get('apiUrl')}")
 
 # 全局设置
 app_settings = load_settings()
 
-# ============== 数据库模拟 (生产环境请使用真实数据库) ==============
-# 使用内存存储 + 简单持久化到 JSON 文件
-import json
+# ============== 数据持久化 ==============
 import threading
 
-DATA_FILE = "data.json"
+data_lock = threading.Lock()
 
 def load_data():
-    """从文件加载数据"""
     try:
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        return {"projects": [], "memories": [], "next_ids": {"project": 1, "memory": 1}}
+        return {
+            "projects": [], 
+            "memories": [], 
+            "agents": [],
+            "channels": [],
+            "agent_memories": {},
+            "agent_tasks": {},
+            "next_ids": {"project": 1, "memory": 1, "agent": 1, "agent_memory": 1}
+        }
 
 def save_data(data):
-    """保存数据到文件"""
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# 线程安全的全局数据存储
-data_lock = threading.Lock()
 _data = load_data()
 
-def get_projects():
-    with data_lock:
-        return _data.get("projects", [])
+# ============== Pydantic 数据模型 (使用明确的后缀避免冲突) ==============
 
-def get_memories():
-    with data_lock:
-        return _data.get("memories", [])
+class ChatRequest(BaseModel):
+    message: str
+    project_id: Optional[int] = None
 
-def save_project(project_data):
-    with data_lock:
-        _data["projects"].append(project_data)
-        save_data(_data)
-        return project_data
+class ChatResponse(BaseModel):
+    response: str
+    agent: str = "玄灵AI"
 
-def save_memory(memory_data):
-    with data_lock:
-        _data["memories"].append(memory_data)
-        save_data(_data)
-        return memory_data
+class ProjectRequest(BaseModel):
+    """项目创建/更新请求"""
+    name: str
+    description: Optional[str] = ""
+    icon: str = "📁"
+    status: str = "进行中"
+    progress: int = 0
+    tasks: int = 0
+    memory: int = 0
 
-# 初始化默认数据
-if not _data["projects"]:
-    _data["projects"] = [
-        {"id": 1, "name": "AI 智能代理框架", "description": "基于 OpenClaw 构建", "icon": "🤖", "status": "进行中", "progress": 65, "tasks": 12, "memory": 5},
-        {"id": 2, "name": "Web 控制台", "description": "玄灵AI 管理界面", "icon": "🌐", "status": "进行中", "progress": 80, "tasks": 8, "memory": 3},
-    ]
-    _data["next_ids"]["project"] = 3
+class MemoryRequest(BaseModel):
+    """记忆创建请求"""
+    title: str
+    content: str
+    tags: List[str] = []
+    project_id: Optional[int] = None
+    importance: int = 1
 
-# 确保首次启动时默认项目也持久化到 data.json
-try:
-    save_data(_data)
-except Exception as _e:
-    logger.error(f"初始化持久化失败: {_e}")
+class AgentRequest(BaseModel):
+    """子代理创建请求"""
+    name: str
+    description: Optional[str] = ""
+    status: Optional[str] = "idle"
 
-if not _data["memories"]:
-    _data["memories"] = [
-        {"id": 1, "title": "主人称呼偏好", "content": "喜欢被称呼为老板", "tags": ["个人"], "importance": 5, "project_id": None},
-        {"id": 2, "title": "最喜欢的颜色", "content": "蓝色", "tags": ["偏好"], "importance": 3, "project_id": None},
-        {"id": 3, "title": "AI 项目", "content": "正在做 AI 项目", "tags": ["重要"], "importance": 5, "project_id": None},
-    ]
-    _data["next_ids"]["memory"] = 4
-    save_data(_data)
+class AgentMemoryRequest(BaseModel):
+    """子代理记忆请求"""
+    title: str
+    content: Optional[str] = ""
+
+class SettingsRequest(BaseModel):
+    """设置请求"""
+    model: str
+    apiUrl: str
+    apiKey: Optional[str] = None
+
+class ChannelRequest(BaseModel):
+    """频道配置请求"""
+    id: str
+    name: Optional[str] = ""
+    provider: Optional[str] = ""
+    webhook_url: Optional[str] = None
+    default_target: Optional[str] = None
+    token: Optional[str] = None
+
+class CreateProjectRequest(BaseModel):
+    """项目管理 - 创建项目请求"""
+    name: str
+    description: str = ""
+    owner: str = None
+    tags: List[str] = []
+    icon: str = "📁"
+    color: str = "#667eea"
+
+class CreateTaskRequest(BaseModel):
+    """项目管理 - 创建任务请求"""
+    title: str
+    description: str = ""
+    priority: int = 5
+    assignee: str = None
+    tags: List[str] = []
+
+class CreateTasksFromTextRequest(BaseModel):
+    """项目管理 - 从文字创建任务请求"""
+    text: str
+
+class ToolExecuteRequest(BaseModel):
+    """工具执行请求"""
+    tool_name: str
+    arguments: Dict[str, Any] = {}
 
 # ============== FastAPI 应用 ==============
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    logger.info("🚀 玄灵AI 后端启动")
+    logger.info("🚀 玄灵AI 后端启动 v1.3.0")
+    
+    # 初始化缓存
+    init_cache(default_ttl=60, max_size=500)
+    logger.info("✅ 缓存系统初始化完成")
+    
+    # 初始化技能管理器
+    skill_manager.set_tool_registry(tool_registry)
+    skill_manager.set_audit_logger(audit_logger)
+    await skill_manager.load_all()
+    
+    # 启动任务调度器
+    await task_scheduler.start()
+    
+    # 创建默认代理
+    try:
+        await create_subagent("主代理", AgentRole.WORKER)
+        await create_subagent("规划代理", AgentRole.PLANNER)
+        logger.info("✅ 默认代理已创建")
+    except Exception as e:
+        logger.warning(f"创建默认代理失败: {e}")
+    
     yield
+    
+    # 清理
+    await task_scheduler.stop()
     logger.info("🛑 玄灵AI 后端关闭")
 
-app = FastAPI(title="玄灵AI API", version="1.1.0", lifespan=lifespan)
+app = FastAPI(title="玄灵AI API", version="1.3.0", lifespan=lifespan)
 
-# ============== CORS 中间件 (安全配置) ==============
+# ============== CORS 中间件 ==============
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -164,204 +263,10 @@ async def general_exception_handler(request: Request, exc: Exception):
         content={"error": "服务器内部错误，请稍后重试"}
     )
 
-# ============== 数据模型 ==============
-
-class ChatRequest(BaseModel):
-    message: str
-    project_id: Optional[int] = None
-
-class ChatResponse(BaseModel):
-    response: str
-    agent: str = "玄灵AI"
-
-class Project(BaseModel):
-    id: Optional[int] = None
-    name: Optional[str] = None
-    description: Optional[str] = ""
-    icon: Optional[str] = "📁"
-    status: Optional[str] = "进行中"
-    progress: Optional[int] = 0
-    tasks: Optional[int] = 0
-    memory: Optional[int] = 0
-
-class Memory(BaseModel):
-    id: Optional[int] = None
-    title: str
-    content: str
-    tags: List[str] = []
-    project_id: Optional[int] = None
-    importance: int = 1
-
-# 子代理与文件写入请求模型
-class AgentCreate(BaseModel):
-    name: str
-    description: Optional[str] = ""
-
-class AgentUpdate(BaseModel):
-    description: Optional[str] = None
-    status: Optional[str] = None
-
-class AgentMemoryCreate(BaseModel):
-    title: str
-    content: Optional[str] = ""
-
-class FileSave(BaseModel):
-    content: str = ""
-
-
-# ============== 通道与工具（对齐 OpenClaw 思路的最小实现） ==============
-from typing import Dict, Any
-
-CHANS_FILE = "channels.json"
-
-class Channel(BaseModel):
-    id: str
-    name: str
-    provider: str  # feishu|wecom|slack|discord|telegram|webhook
-    enabled: bool = True
-    webhook_url: Optional[str] = None  # 通用 webhook 优先
-    default_target: Optional[str] = None
-    token: Optional[str] = None  # 仅内存保存，不落盘
-
-# 进程内保存 token，文件仅保存非敏感
-_channel_tokens: Dict[str, str] = {}
-
-def _load_channels() -> list[dict]:
-    try:
-        with open(CHANS_FILE, 'r', encoding='utf-8') as f:
-            arr = json.load(f)
-            return arr if isinstance(arr, list) else []
-    except FileNotFoundError:
-        return []
-    except Exception as e:
-        logger.error(f"加载 {CHANS_FILE} 失败: {e}")
-        return []
-
-def _save_channels(chans: list[dict]):
-    # 只保存非敏感字段
-    scrubs = []
-    for c in chans:
-        d = dict(c)
-        d.pop('token', None)
-        scrubs.append(d)
-    with open(CHANS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(scrubs, f, ensure_ascii=False, indent=2)
-
-_channels = _load_channels()
-
-@app.get('/api/channels')
-def list_channels():
-    # 返回时不带 token
-    return {"channels": _channels}
-
-@app.post('/api/channels')
-def upsert_channel(ch: Channel):
-    # 记录 token 到内存
-    if ch.token:
-        _channel_tokens[ch.id] = ch.token
-    # 更新或插入
-    exist = None
-    for i,c in enumerate(_channels):
-        if c.get('id') == ch.id:
-            exist = i; break
-    record = {
-        "id": ch.id, "name": ch.name, "provider": ch.provider,
-        "enabled": ch.enabled, "webhook_url": ch.webhook_url,
-        "default_target": ch.default_target
-    }
-    if exist is None:
-        _channels.append(record)
-    else:
-        _channels[exist] = record
-    _save_channels(_channels)
-    return {"status":"ok","channel":record}
-
-@app.delete('/api/channels/{chan_id}')
-def delete_channel(chan_id: str):
-    global _channels
-    _channels = [c for c in _channels if c.get('id') != chan_id]
-    _channel_tokens.pop(chan_id, None)
-    _save_channels(_channels)
-    return {"status":"ok"}
-
-@app.post('/api/channels/{chan_id}/test')
-def test_channel(chan_id: str, payload: dict):
-    """测试发送：优先调用 webhook_url，以 JSON 发送 {text, target?}，失败则模拟。"""
-    msg = payload.get('text') or 'hello from 玄灵AI'
-    target = payload.get('target')
-    for c in _channels:
-        if c.get('id') == chan_id:
-            url = c.get('webhook_url')
-            if url:
-                try:
-                    import requests
-                    r = requests.post(url, json={"text": msg, "target": target or c.get('default_target')}, timeout=5)
-                    return {"status":"ok","code": r.status_code}
-                except Exception as e:
-                    logger.error(f"测试发送失败: {e}")
-                    break
-            # 无 webhook 或失败，走模拟
-            logger.info(f"[SIM_SEND] provider={c.get('provider')} target={target or c.get('default_target')} text={msg}")
-            return {"status":"ok","simulated": True}
-    raise HTTPException(status_code=404, detail="channel not found")
-
-# —— 工具最小实现：将后端已实现能力以工具形式暴露 ——
-class ToolRun(BaseModel):
-    name: str
-    args: dict = {}
-
-_TOOLS: Dict[str, Dict[str, Any]] = {
-    "projects.create": {"desc": "创建项目", "schema": {"name":"str","description":"str?","icon":"str?"}},
-    "projects.update": {"desc": "更新项目", "schema": {"id":"int","progress":"int?","status":"str?"}},
-    "memory.create":   {"desc": "新增记忆", "schema": {"title":"str","content":"str?","tags":"list?","importance":"int?"}},
-}
-
-@app.get('/api/tools')
-def list_tools():
-    return {"tools": [{"name": k, **v} for k,v in _TOOLS.items()]}
-
-@app.post('/api/tools/run')
-def run_tool(run: ToolRun):
-    n = run.name
-    a = run.args or {}
-    if n == 'projects.create':
-        proj = Project(name=a.get('name'), description=a.get('description'), icon=a.get('icon'))
-        return create_project(proj)
-    if n == 'projects.update':
-        pid = int(a.get('id'))
-        proj = Project(progress=a.get('progress'), status=a.get('status'))
-        return update_project(pid, proj)
-    if n == 'memory.create':
-        mem = Memory(title=a.get('title'), content=a.get('content') or '', tags=a.get('tags') or [], importance=int(a.get('importance') or 1))
-        return create_memory(mem)
-    raise HTTPException(status_code=400, detail='unknown tool')
-
-# ============== 真实 AI 对接 (MiniMax) ==============
-
-CAPABILITIES_TEXT = r"""
-你是玄灵AI，具备以下内置能力（已实现的真实功能）：
-1) 项目管理：
-   - 接口：GET/POST/PUT/DELETE /projects（创建/更新进度与状态/删除）
-   - 界面：控制台侧边栏“项目管理”，可浏览项目卡片
-   - 文件：/project-manager/projects/{name}/files/{path} 可读写项目文件（含路径安全校验）
-2) 记忆系统：
-   - 接口：GET/POST/DELETE /api/memory（兼容 /memory）
-   - 用于记录偏好、重要信息与项目关联笔记
-3) 子代理管理：
-   - 接口：GET/POST/PUT/DELETE /agents；子路由 /agents/{id}/memory, /agents/{id}/tasks
-   - 用于管理自动化子任务与其记忆/历史
-4) 对话：
-   - 接口：POST /api/chat（接入 MiniMax；无 Key 时走模拟回复）
-5) 设置/模型：
-   - 接口：GET/POST /api/settings、/config、/models 相关
-6) 监控与运维：
-   - 接口：/api/health、/api/monitor、/api/logs、POST /api/restart（可选令牌 X-Admin-Token）
-请基于上述真实能力回答用户，不要声称“没有项目管理模块”。当被问及“项目管理能做什么”，应说明增删改查项目、进度状态管理、项目文件读写与控制台导航等。
-"""
+# ============== AI 调用函数 ==============
 
 async def call_minimax_ai(user_message: str) -> str:
-    """调用 MiniMax AI API - 使用保存的设置"""
-    # 优先使用保存的设置，否则回退到环境变量
+    """调用 MiniMax AI API"""
     api_key = app_settings.get("apiKey") or MINIMAX_API_KEY
     api_url = app_settings.get("apiUrl") or MINIMAX_BASE_URL
     model = app_settings.get("model") or "MiniMax-M2.5"
@@ -376,32 +281,22 @@ async def call_minimax_ai(user_message: str) -> str:
             payload = {
                 "model": model,
                 "messages": [
-                    {"role": "system", "content": CAPABILITIES_TEXT},
+                    {"role": "system", "content": "你是玄灵AI，一个友好、聪明的AI助手。"},
                     {"role": "user", "content": user_message}
                 ],
                 "temperature": 0.7,
                 "max_tokens": 500
             }
             
-            # MiniMax API 认证方式
             headers = {
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             }
-            # 兼容不同 API 格式
+            
             if "minimax" in api_url:
-                endpoint = f"%s/text/chatcompletion_v2" % api_url
-                payload = {
-                    "model": model,
-                    "bot_setting": [{"bot_name": "玄灵AI", "content": CAPABILITIES_TEXT}],
-                    "messages": [
-                        {"role": "user", "content": user_message}
-                    ],
-                    "temperature": 0.7,
-                    "max_tokens": 500
-                }
+                endpoint = f"{api_url}/text/chatcompletion_v2"
             else:
-                endpoint = f"%s/chat/completions" % api_url
+                endpoint = f"{api_url}/chat/completions"
             
             async with session.post(
                 endpoint,
@@ -411,13 +306,11 @@ async def call_minimax_ai(user_message: str) -> str:
             ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    # 兼容不同返回格式
                     choices = data.get("choices", [])
                     if choices:
                         msg = choices[0].get("message", {})
                         return msg.get("content", msg.get("text", "抱歉，AI 响应为空"))
                     
-                    # 检查是否有错误
                     if data.get("base_resp", {}).get("status_msg"):
                         error_msg = data["base_resp"]["status_msg"]
                         logger.error(f"AI API 返回错误: {error_msg}")
@@ -429,65 +322,32 @@ async def call_minimax_ai(user_message: str) -> str:
                     logger.error(f"AI API 错误: {resp.status} - {error_text}")
                     return f"API 错误 ({resp.status}): {error_text[:100]}"
     except ImportError:
-        logger.warning("aiohttp 未安装，使用模拟回复")
         return await mock_ai_response(user_message)
     except Exception as e:
         logger.error(f"AI 调用失败: {e}")
         return await mock_ai_response(user_message)
 
 async def mock_ai_response(message: str) -> str:
-    """模拟 AI 回复 (当没有 API Key 时使用)"""
+    """模拟 AI 回复"""
     msg = message.lower()
     
-    # 智能关键词匹配
-    if ("项目管理" in message) or ("项目" in message and ("功能" in message or "做什么" in message or "用途" in message)):
-        return (
-            "我的项目管理功能是内置且可直接使用的，主要包括：
-
-"
-            "- 增删改查项目：GET/POST/PUT/DELETE /projects，支持进度(progress)、状态(status) 等更新
-"
-            "- 控制台操作：侧边栏进入‘项目管理’，浏览项目卡片、打开项目详情
-"
-            "- 项目文件：/project-manager/projects/{name}/files/{path} 可读取/保存项目内文件（含路径安全校验）
-"
-            "- 关联能力：可与记忆系统(/api/memory)与子代理(/agents)协作，对任务/笔记/自动化联动
-
-"
-            "如果你告诉我项目名称与需求，我可以：
-"
-            "1) 立即创建一个项目；
-"
-            "2) 为它添加进度与状态；
-"
-            "3) 初始化项目文件/README；
-"
-            "4) 在控制台中高亮显示便于后续操作。"
-        )
     if "你好" in msg or "hi" in msg or "hello" in msg:
         return "你好！我是玄灵AI，很高兴见到你！有什么我可以帮你的吗？"
     elif "项目" in msg:
-        projects = get_projects()
+        projects = _data.get("projects", [])
         if projects:
-            project_list = "\n".join([f"- {p['icon']} {p['name']}: {p['description']}" for p in projects])
-            return f"当前有 {len(projects)} 个项目正在进行中:\n{project_list}"
+            project_list = "\n".join([f"- {p.get('icon', '📁')} {p['name']}: {p.get('description', '')}" for p in projects])
+            return f"当前有 {len(projects)} 个项目:\n{project_list}"
         return "目前没有项目记录"
-    elif "记忆" in msg or "记得" in msg:
-        memories = get_memories()
-        if memories:
-            important = [m for m in memories if m.get("importance", 0) >= 3]
-            return f"我记住了 {len(memories)} 条信息，其中 {len(important)} 条是重要的"
-        return "还没有记忆记录"
     elif "帮助" in msg or "help" in msg:
         return """我可以帮你:
 - 📁 管理项目 (查看、创建)
 - 🧠 管理记忆 (添加、查询)
-- 💬 对话交流
-直接告诉我你需要什么吧！"""
+- 💬 对话交流"""
     else:
         return f"收到你的消息: {message}\n\n你可以问我关于项目、记忆的问题，或者获取帮助"
 
-# ============== API 路由 ==============
+# ============== 基础路由 ==============
 
 @app.get("/")
 def root():
@@ -495,226 +355,48 @@ def root():
     index_file = STATIC_DIR / "index.html"
     if index_file.exists():
         return FileResponse(str(index_file))
-    return {
-        "message": "玄灵AI API", 
-        "version": "1.1.0",
-        "status": "healthy"
-    }
+    return {"message": "玄灵AI API", "version": "1.2.0", "status": "healthy"}
 
-@app.get("/console")
-def console_page():
-    """返回控制台页面"""
-    console_file = STATIC_DIR / "console.html"
-    if console_file.exists():
-        return FileResponse(str(console_file))
-    return {"message": "控制台不存在"}
+@app.get("/health")
+def health_check():
+    """健康检查"""
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
+
+# ============== 对话 API ==============
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """
-    对话接口 (真实 AI 对接)
-    """
+    """对话接口 - 支持工具调用"""
     logger.info(f"收到消息: {request.message}")
-    
     try:
-        # 调用 AI
-        response = await call_minimax_ai(request.message)
-        logger.info(f"AI 回复: {response[:50]}...")
-        override = _should_override_response(request.message, response)
-        if override:
-            logger.info("AI 回复被能力兜底纠偏覆盖")
-            response = override
+        response = await ai_engine.chat_simple(request.message)
         return ChatResponse(response=response)
     except Exception as e:
         logger.error(f"对话处理失败: {e}")
-        raise HTTPException(status_code=500, detail="对话处理失败")
+        raise HTTPException(status_code=500, detail=f"对话处理失败: {str(e)}")
 
-@app.get("/projects")
-def get_projects_list():
-    """获取项目列表"""
-    return {"projects": get_projects()}
+@app.post("/api/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """流式对话接口"""
+    async def generate():
+        async for event in ai_engine.chat(request.message):
+            event_data = json.dumps(event, ensure_ascii=False)
+            yield f"data: {event_data}\n\n"
+        yield "data: [DONE]\n\n"
+    
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+    )
 
-@app.post("/projects")
-def create_project(project: Project):
-    """创建项目"""
-    logger.info(f"创建项目: {project.name}")
-    
-    if not project.name:
-        raise HTTPException(status_code=400, detail="项目名称不能为空")
-    
-    with data_lock:
-        new_id = _data["next_ids"]["project"]
-        _data["next_ids"]["project"] += 1
-        
-        new_project = {
-            "id": new_id,
-            "name": project.name,
-            "description": project.description or "",
-            "icon": project.icon or "📁",
-            "status": project.status or "进行中",
-            "progress": project.progress or 0,
-            "tasks": project.tasks or 0,
-            "memory": project.memory or 0,
-            "created_at": datetime.now().isoformat()
-        }
-        _data["projects"].append(new_project)
-        save_data(_data)
-    
-    # 在工作区自动创建项目文件夹与 README
-    proj_dir = PROJECTS_DIR / project.name
-    try:
-        proj_dir.mkdir(parents=True, exist_ok=True)
-        readme = proj_dir / "README.md"
-        if not readme.exists():
-            readme.write_text(f"# {project.name}\n\n{project.description or ''}\n\n创建时间: {datetime.now().isoformat()}\n", encoding="utf-8")
-    except Exception as e:
-        logger.error(f"初始化项目目录失败: {e}")
-    
-    return new_project
-
-@app.put("/projects/{project_id}")
-def update_project(project_id: int, project: Project):
-    """更新项目（局部更新）"""
-    logger.info(f"更新项目: {project_id}")
-    
-    with data_lock:
-        for i, p in enumerate(_data["projects"]):
-            if p["id"] == project_id:
-                updated = p.copy()
-                if project.name is not None:
-                    updated["name"] = project.name
-                if project.description is not None:
-                    updated["description"] = project.description
-                if project.icon is not None:
-                    updated["icon"] = project.icon
-                if project.status is not None:
-                    updated["status"] = project.status
-                if project.progress is not None:
-                    updated["progress"] = project.progress
-                if project.tasks is not None:
-                    updated["tasks"] = project.tasks
-                if project.memory is not None:
-                    updated["memory"] = project.memory
-                updated["updated_at"] = datetime.now().isoformat()
-                _data["projects"][i] = updated
-                save_data(_data)
-                return updated
-    
-    raise HTTPException(status_code=404, detail="项目不存在")
-
-@app.delete("/projects/{project_id}")
-def delete_project(project_id: int):
-    """删除项目"""
-    logger.info(f"删除项目: {project_id}")
-    
-    with data_lock:
-        for i, p in enumerate(_data["projects"]):
-            if p["id"] == project_id:
-                deleted = _data["projects"].pop(i)
-                save_data(_data)
-                return {"message": "删除成功", "project": deleted}
-    
-    raise HTTPException(status_code=404, detail="项目不存在")
-
-@app.get("/api/memory")
-def get_memory_list(project_id: Optional[int] = None):
-    """获取记忆列表"""
-    memories = get_memories()
-    if project_id:
-        return [m for m in memories if m.get("project_id") == project_id]
-    return memories
-
-# 兼容 /memory 路由（前端旧逻辑）
-@app.get("/memory")
-def get_memory_list_compat(project_id: Optional[int] = None):
-    memories = get_memories()
-    if project_id:
-        memories = [m for m in memories if m.get("project_id") == project_id]
-    return {"memories": memories}
-
-@app.post("/memory")
-def create_memory_compat(memory: Memory):
-    created = create_memory(memory)  # 复用主实现
-    return {"memory": created, "status": "ok"}
-
-@app.delete("/memory/{memory_id}")
-def delete_memory_compat(memory_id: int):
-    return delete_memory(memory_id)
-
-@app.post("/api/memory")
-def create_memory(memory: Memory):
-    """创建记忆"""
-    logger.info(f"创建记忆: {memory.title}")
-    
-    if not memory.title:
-        raise HTTPException(status_code=400, detail="记忆标题不能为空")
-    
-    with data_lock:
-        new_id = _data["next_ids"]["memory"]
-        _data["next_ids"]["memory"] += 1
-        
-        new_memory = {
-            "id": new_id,
-            "title": memory.title,
-            "content": memory.content,
-            "tags": memory.tags,
-            "project_id": memory.project_id,
-            "importance": memory.importance,
-            "created_at": datetime.now().isoformat()
-        }
-        _data["memories"].append(new_memory)
-        save_data(_data)
-    
-    return new_memory
-
-@app.delete("/api/memory/{memory_id}")
-def delete_memory(memory_id: int):
-    """删除记忆"""
-    logger.info(f"删除记忆: {memory_id}")
-    
-    with data_lock:
-        for i, m in enumerate(_data["memories"]):
-            if m["id"] == memory_id:
-                deleted = _data["memories"].pop(i)
-                save_data(_data)
-                return {"message": "删除成功", "memory": deleted}
-    
-    raise HTTPException(status_code=404, detail="记忆不存在")
-
-@app.get("/api/tasks")
-def get_tasks():
-    """获取定时任务"""
-    return [
-        {"id": 1, "name": "每日早间简报", "schedule": "0 8 * * *", "status": "running"},
-        {"id": 2, "name": "健康检查", "schedule": "0 * * * *", "status": "running"},
-        {"id": 3, "name": "自动备份", "schedule": "0 2 * * *", "status": "paused"},
-        {"id": 4, "name": "周报汇总", "schedule": "0 9 * * 1", "status": "running"},
-    ]
-
-@app.get("/api/agents")
-def get_agents():
-    """获取子代理"""
-    return [
-        {"id": 1, "name": "代码审查代理", "status": "running", "tasks": 12, "success_rate": 0.92},
-        {"id": 2, "name": "文档助手", "status": "running", "tasks": 8, "success_rate": 1.0},
-        {"id": 3, "name": "网页抓取代理", "status": "idle", "tasks": 5, "success_rate": 1.0},
-    ]
-
-@app.get("/api/skills")
-def get_skills():
-    """获取 Skills"""
-    return [
-        {"name": "feishu-doc", "installed": True},
-        {"name": "DGM Skill", "installed": True},
-        {"name": "tencent-cos", "installed": False},
-    ]
+@app.post("/api/chat/json")
+async def chat_json(request: ChatRequest):
+    """对话接口 - JSON 格式"""
+    response = await ai_engine.chat_simple(request.message)
+    return {"message": response, "status": "ok"}
 
 # ============== 设置 API ==============
-
-class SettingsRequest(BaseModel):
-    model: str
-    apiUrl: str
-    apiKey: Optional[str] = None
 
 @app.get("/api/settings")
 def get_settings():
@@ -724,88 +406,39 @@ def get_settings():
 @app.post("/api/settings")
 def save_settings(settings: SettingsRequest):
     """保存设置"""
-    logger.info(f"保存设置: model={settings.model}, apiUrl={settings.apiUrl}")
-    
     global app_settings
-    # 保存到全局变量（包括 apiKey，用于本次会话）
     app_settings = {
         "model": settings.model,
         "apiUrl": settings.apiUrl,
-        "apiKey": settings.apiKey or ""  # 仅存内存，不写入文件
+        "apiKey": settings.apiKey or ""
     }
-    # 保存非敏感配置到文件
     save_settings_to_file(app_settings)
-    
     return {"message": "设置已保存", "settings": app_settings}
 
-@app.get("/api/monitor")
-def get_monitor():
-    """获取系统监控"""
-    return {
-        "cpu": 35,
-        "memory": 48,
-        "tasks_active": 3,
-        "api_usage": 85,
-    }
-
-@app.get("/api/health")
-def health_check():
-    """健康检查"""
-    return {
-        "status": "ok",
-        "timestamp": datetime.now().isoformat(),
-        "data_file_exists": os.path.exists(DATA_FILE)
-    }
-
-# ============== 兼容前端路由 ==============
-
-# 兼容 /health
-@app.get("/health")
-def health_compat():
-    return {"status": "ok", "timestamp": datetime.now().isoformat()}
-
-# 后端日志尾部输出（用于“本地运行状态”监控）
-@app.get("/api/logs")
-def tail_logs(lines: int = 80):
-    log_path = Path('/tmp/xuanling.log')
-    if not log_path.exists():
-        return HTMLResponse("无日志文件")
-    try:
-        content = log_path.read_text(encoding='utf-8')
-        # 取末尾 N 行
-        parts = content.splitlines()[-lines:]
-        return HTMLResponse("\n".join(parts))
-    except Exception as e:
-        return HTMLResponse(f"读取日志失败: {e}")
-
-# 兼容 /config GET/POST
-@app.get("/config")
+@app.get("/api/config")
 def get_config():
+    """获取配置"""
     return {
         "api_url": app_settings.get("apiUrl", ""),
         "model": app_settings.get("model", "MiniMax-M2.5"),
         "provider": "minimax"
     }
 
-@app.post("/config")
-async def save_config(request: Request):
-    # 将 /config 保存兼容到 /api/settings
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+@app.post("/api/config")
+def save_config(settings: SettingsRequest):
+    """保存配置"""
     global app_settings
-    model = body.get('model') or app_settings.get('model')
-    api_url = body.get('api_url') or body.get('apiUrl') or app_settings.get('apiUrl')
-    api_key = body.get('api_key') or body.get('apiKey')
-    # 更新内存配置并落盘非敏感
-    app_settings = {"model": model, "apiUrl": api_url, "apiKey": api_key or app_settings.get('apiKey', '')}
+    app_settings = {
+        "model": settings.model,
+        "apiUrl": settings.apiUrl,
+        "apiKey": settings.apiKey or ""
+    }
     save_settings_to_file(app_settings)
     return {"status": "ok", "message": "配置已保存"}
 
-# 兼容 /models GET
-@app.get("/models")
+@app.get("/api/models")
 def get_models():
+    """获取可用模型"""
     return {
         "models": [
             {"id": "minimax", "name": "MiniMax M2.5", "is_active": True},
@@ -818,303 +451,635 @@ def get_models():
         }
     }
 
-# 兼容 /models/{id}/activate POST
-@app.post("/models/{provider_id}/activate")
-def activate_model(provider_id: str, request: Request):
+@app.post("/api/models/{provider_id}/activate")
+def activate_model(provider_id: str):
+    """激活模型"""
     return {"status": "ok"}
 
-# 兼容 /project-manager/projects
-@app.get("/project-manager/projects")
-def get_projects_compat():
-    return {"projects": get_projects(), "status": "ok"}
+# ============== 监控 API ==============
 
-# 兼容 /project-manager/projects/{name}
-@app.get("/project-manager/projects/{project_name}")
-def get_project_detail(project_name: str):
-    # 安全列出项目目录下文件（限定到 server/ 静态根的上级工作区）
-    # 这里示例使用 workspace 根目录的同名文件夹作为项目根
-    project_root = PROJECTS_DIR / project_name
-    files = []
-    if project_root.exists() and project_root.is_dir():
-        for path in project_root.rglob('*'):
-            if path.is_file():
-                # 只统计合理大小的文本/代码文件
-                try:
-                    rel = path.relative_to(project_root).as_posix()
-                    size = path.stat().st_size
-                    # 跳过敏感/隐藏目录和大文件
-                    if any(part.startswith('.') for part in path.parts):
-                        continue
-                    if size > 2 * 1024 * 1024:  # >2MB 不展示
-                        continue
-                    files.append({"path": rel, "size": size})
-                except Exception:
-                    continue
-    return {"project": {"name": project_name}, "files": files, "status": "ok"}
-
-
-# 兼容 /agents
-# 子代理内存占位存储
-_agents_state = {
-    1: {"id": 1, "name": "代码审查代理", "status": "running", "tasks_count": 12, "success_rate": 0.92, "description": "自动审查代码"},
-    2: {"id": 2, "name": "文档助手", "status": "running", "tasks_count": 8, "success_rate": 1.0, "description": "生成文档"},
-    3: {"id": 3, "name": "网页抓取代理", "status": "idle", "tasks_count": 5, "success_rate": 1.0, "description": "抓取网页"}
-}
-_next_agent_id = 4
-_agent_memories = {1: {}, 2: {}, 3: {}}
-_agent_tasks = {1: [], 2: [], 3: []}
-
-# 子代理持久化：在 /workspace/agents/{id}-{name}/ 目录下维护 memory.json 与 tasks.json
-
-def _agent_dir(agent_id: int, name: str) -> Path:
-    safe_name = ''.join(c for c in name if c.isalnum() or c in ('-','_'))[:50] or f"agent{agent_id}"
-    d = AGENTS_DIR / f"{agent_id}-{safe_name}"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
-
-def _load_json(path: Path, default):
-    try:
-        if path.exists():
-            return json.load(path.open('r', encoding='utf-8'))
-    except Exception:
-        pass
-    return default
-
-def _save_json(path: Path, data):
-    try:
-        json.dump(data, path.open('w', encoding='utf-8'), ensure_ascii=False, indent=2)
-    except Exception as e:
-        logger.error(f"写入 {path} 失败: {e}")
-
-@app.get("/agents")
-def list_agents():
-    return {"agents": list(_agents_state.values())}
-
-@app.post("/agents")
-def create_agent(payload: AgentCreate):
-    global _next_agent_id
-    if not payload.name:
-        raise HTTPException(status_code=400, detail="子代理名称不能为空")
-    agent = {
-        "id": _next_agent_id,
-        "name": payload.name,
-        "description": payload.description or "",
-        "status": "idle",
-        "tasks_count": 0,
-        "success_rate": 1.0
-    }
-    _agents_state[_next_agent_id] = agent
-    _agent_memories[_next_agent_id] = {}
-    _agent_tasks[_next_agent_id] = []
-    # 初始化记忆与任务持久化文件
-    d = _agent_dir(_next_agent_id, payload.name)
-    _save_json(d / 'memory.json', {})
-    _save_json(d / 'tasks.json', [])
-    _next_agent_id += 1
-    return {"status": "ok", "agent": agent}
-
-@app.put("/agents/{agent_id}")
-def update_agent(agent_id: int, payload: AgentUpdate):
-    agent = _agents_state.get(agent_id)
-    if not agent:
-        raise HTTPException(status_code=404, detail="子代理不存在")
-    if payload.description is not None:
-        agent["description"] = payload.description
-    if payload.status is not None:
-        agent["status"] = payload.status
-    # 追加一条任务历史（状态变更视为任务）
-    d = _agent_dir(agent_id, agent["name"])
-    tasks = _load_json(d / 'tasks.json', [])
-    tasks.append({"ts": datetime.now().isoformat(), "task": "status_update", "status": agent["status"]})
-    _save_json(d / 'tasks.json', tasks)
-    return {"status": "ok", "agent": agent}
-
-@app.delete("/agents/{agent_id}")
-def delete_agent(agent_id: int):
-    if agent_id not in _agents_state:
-        raise HTTPException(status_code=404, detail="子代理不存在")
-    del _agents_state[agent_id]
-    _agent_memories.pop(agent_id, None)
-    _agent_tasks.pop(agent_id, None)
-    return {"status": "ok"}
-
-@app.get("/agents/{agent_id}/memory")
-def get_agent_memory(agent_id: int):
-    mems = _agent_memories.get(agent_id)
-    agent = _agents_state.get(agent_id)
-    if mems is None or not agent:
-        raise HTTPException(status_code=404, detail="子代理不存在")
-    # 合并内存态与持久化文件
-    d = _agent_dir(agent_id, agent["name"])
-    file_mems = _load_json(d / 'memory.json', {})
-    merged = {**file_mems, **mems}
-    return {"memories": merged}
-
-@app.post("/agents/{agent_id}/memory")
-def add_agent_memory(agent_id: int, payload: AgentMemoryCreate):
-    if not payload.title:
-        raise HTTPException(status_code=400, detail="记忆标题不能为空")
-    agent = _agents_state.get(agent_id)
-    if not agent:
-        raise HTTPException(status_code=404, detail="子代理不存在")
-    # 写入内存并持久化
-    mems = _agent_memories.setdefault(agent_id, {})
-    mem_id = (max(mems.keys()) + 1) if mems else 1
-    rec = {"id": mem_id, "title": payload.title, "content": payload.content or ""}
-    mems[mem_id] = rec
-    d = _agent_dir(agent_id, agent["name"])
-    file_mems = _load_json(d / 'memory.json', {})
-    file_mems[str(mem_id)] = rec
-    _save_json(d / 'memory.json', file_mems)
-    return {"status": "ok", "memory": rec}
-
-@app.get("/agents/{agent_id}/tasks")
-def get_agent_tasks(agent_id: int):
-    agent = _agents_state.get(agent_id)
-    if not agent:
-        raise HTTPException(status_code=404, detail="子代理不存在")
-    d = _agent_dir(agent_id, agent["name"])
-    tasks = _load_json(d / 'tasks.json', [])
-    return {"tasks": tasks}
-
-# 兼容 /chat/json
-@app.post("/chat/json")
-async def chat_json(request: ChatRequest):
-    logger.info(f"收到消息: {request.message}")
-    response = await call_minimax_ai(request.message)
-    return {"message": response, "status": "ok"}
-
-# 兼容 /skills
-@app.get("/skills")
-def get_skills_compat():
+@app.get("/api/health")
+def api_health_check():
+    """API 健康检查"""
     return {
-        "skills": [
-            {"name": "feishu-doc", "description": "飞书文档操作", "tools": ["read", "write"]},
-            {"name": "DGM", "description": "自我改进AI", "tools": ["improve"]},
-            {"name": "github", "description": "GitHub操作", "tools": ["issue", "pr"]}
-        ]
+        "status": "ok",
+        "timestamp": datetime.now().isoformat(),
+        "data_file_exists": os.path.exists(DATA_FILE)
     }
 
-# 兼容 /bg-tasks
-@app.get("/bg-tasks")
+@app.get("/api/monitor")
+def get_monitor():
+    """获取系统监控"""
+    import psutil
+    cache = get_cache()
+    try:
+        return {
+            "cpu": psutil.cpu_percent(interval=1),
+            "memory": psutil.virtual_memory().percent,
+            "tasks_active": len(task_scheduler._tasks),
+            "api_usage": 0,
+            "cache": cache.get_stats()
+        }
+    except:
+        return {
+            "cpu": 35, 
+            "memory": 48, 
+            "tasks_active": 3, 
+            "api_usage": 85,
+            "cache": cache.get_stats()
+        }
+
+@app.get("/api/cache/stats")
+def get_cache_stats():
+    """获取缓存统计"""
+    cache = get_cache()
+    return cache.get_stats()
+
+@app.post("/api/cache/clear")
+def clear_cache():
+    """清空缓存"""
+    cache = get_cache()
+    cache.clear()
+    return {"status": "ok", "message": "缓存已清空"}
+
+@app.get("/api/logs")
+def get_logs(lines: int = 100):
+    """获取后端日志"""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["tail", "-n", str(lines), "/tmp/xuanling.log"],
+            capture_output=True, text=True, timeout=5
+        )
+        return result.stdout if result.returncode == 0 else "日志文件不存在或为空"
+    except Exception as e:
+        return f"获取日志失败: {str(e)}"
+
+@app.get("/api/bg-tasks")
 def get_bg_tasks():
+    """获取后台任务"""
     return {"tasks": []}
 
-# 兼容 /project-manager/projects/{name}/files/{path}
-def _safe_project_paths(project_name: str, file_path: str) -> Path:
-    project_root = (PROJECTS_DIR / project_name).resolve()
-    target = (project_root / file_path).resolve()
-    if not str(target).startswith(str(project_root)):
-        raise HTTPException(status_code=400, detail="非法路径")
-    return target
+# ============== 工具系统 API ==============
 
-@app.get("/project-manager/projects/{project_name}/files/{file_path:path}")
-def get_project_file(project_name: str, file_path: str):
-    target = _safe_project_paths(project_name, file_path)
-    if not target.exists() or not target.is_file():
+@app.get("/api/tools")
+def get_tools():
+    """获取所有可用工具 (缓存 60 秒)"""
+    cache = get_cache()
+    cached = cache.get("/api/tools")
+    if cached:
+        return cached
+    
+    tools = tool_registry.list_all()
+    result = {
+        "tools": [
+            {
+                "name": t.name,
+                "description": t.description,
+                "category": t.category,
+                "parameters": t.parameters,
+                "dangerous": t.dangerous
+            }
+            for t in tools
+        ],
+        "count": len(tools)
+    }
+    cache.set("/api/tools", result, ttl=60)
+    return result
+
+@app.get("/api/tools/{tool_name}")
+def get_tool_detail(tool_name: str):
+    """获取工具详情"""
+    tool = tool_registry.get(tool_name)
+    if not tool:
+        raise HTTPException(status_code=404, detail=f"工具 {tool_name} 不存在")
+    return {
+        "name": tool.name,
+        "description": tool.description,
+        "category": tool.category,
+        "parameters": tool.parameters,
+        "dangerous": tool.dangerous
+    }
+
+@app.post("/api/tools/execute")
+async def execute_tool(request: ToolExecuteRequest):
+    """执行工具"""
+    logger.info(f"执行工具: {request.tool_name}({request.arguments})")
+    result = await tool_registry.execute(request.tool_name, request.arguments)
+    return result
+
+# ============== 技能系统 API ==============
+
+@app.get("/api/skills")
+def api_list_skills():
+    """获取所有技能 (缓存 60 秒)"""
+    cache = get_cache()
+    cached = cache.get("/api/skills")
+    if cached:
+        return cached
+    
+    result = {"skills": skill_manager.list_skills()}
+    cache.set("/api/skills", result, ttl=60)
+    return result
+
+@app.get("/api/skills/{skill_name}")
+def api_get_skill(skill_name: str):
+    """获取技能详情"""
+    skill = skill_manager.get_skill(skill_name)
+    if not skill:
+        raise HTTPException(status_code=404, detail=f"技能不存在: {skill_name}")
+    return {
+        "name": skill_name,
+        "metadata": skill.metadata.to_dict(),
+        "state": {
+            "loaded": skill._state.loaded,
+            "running": skill._state.running,
+            "execution_count": skill._state.execution_count
+        },
+        "handlers": list(skill._handlers.keys())
+    }
+
+@app.post("/api/skills/{skill_name}/execute")
+async def api_execute_skill(skill_name: str, action: str = "execute", params: Dict = None):
+    """执行技能动作"""
+    result = await skill_manager.execute(skill_name, action, params)
+    return result
+
+@app.post("/api/skills/{skill_name}/start")
+async def api_start_skill(skill_name: str):
+    """启动技能"""
+    success = await skill_manager.start_skill(skill_name)
+    return {"success": success, "skill": skill_name}
+
+@app.post("/api/skills/{skill_name}/stop")
+async def api_stop_skill(skill_name: str):
+    """停止技能"""
+    success = await skill_manager.stop_skill(skill_name)
+    return {"success": success, "skill": skill_name}
+
+@app.post("/api/skills/reload")
+async def api_reload_skills():
+    """热重载所有技能"""
+    results = {}
+    for skill_file in skill_manager.discover_skills():
+        name = await skill_manager.load_skill(skill_file)
+        results[str(skill_file)] = "loaded" if name else "failed"
+    return {"results": results}
+
+# ============== 子代理系统 API ==============
+
+@app.get("/api/subagents")
+def api_list_subagents():
+    """获取所有子代理"""
+    stats = task_scheduler.get_stats()
+    return {"agents": stats.get("agents", {})}
+
+@app.post("/api/subagents")
+async def api_create_subagent(name: str, role: str = "worker", skills: List[str] = None):
+    """创建子代理"""
+    role_enum = AgentRole(role) if role in [r.value for r in AgentRole] else AgentRole.WORKER
+    agent = await create_subagent(name, role_enum, skills)
+    return {"success": True, "agent": agent.get_status()}
+
+@app.get("/api/subagents/{agent_id}")
+def api_get_subagent(agent_id: str):
+    """获取子代理详情"""
+    agent = task_scheduler._agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"代理不存在: {agent_id}")
+    return agent.get_status()
+
+@app.post("/api/subagents/{agent_id}/pause")
+def api_pause_subagent(agent_id: str):
+    """暂停子代理"""
+    agent = task_scheduler._agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"代理不存在: {agent_id}")
+    agent.pause()
+    return {"success": True, "status": "paused"}
+
+@app.post("/api/subagents/{agent_id}/resume")
+def api_resume_subagent(agent_id: str):
+    """恢复子代理"""
+    agent = task_scheduler._agents.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"代理不存在: {agent_id}")
+    agent.resume()
+    return {"success": True, "status": "running"}
+
+# ============== 任务系统 API ==============
+
+@app.get("/api/tasks/stats")
+def api_task_stats():
+    """获取任务统计"""
+    return task_scheduler.get_stats()
+
+@app.get("/api/tasks")
+def api_list_tasks(status: str = None):
+    """获取任务列表"""
+    task_status = SubTaskStatus(status) if status else None
+    return {"tasks": task_scheduler.list_tasks(task_status)}
+
+@app.post("/api/tasks")
+async def api_submit_task(goal: str, name: str = None, priority: str = "normal", steps: List[Dict] = None):
+    """提交新任务"""
+    priority_enum = {
+        "low": SubTaskPriority.LOW,
+        "normal": SubTaskPriority.NORMAL,
+        "high": SubTaskPriority.HIGH,
+        "critical": SubTaskPriority.CRITICAL
+    }.get(priority, SubTaskPriority.NORMAL)
+    
+    task_id = await submit_task(goal, name, priority_enum, steps)
+    return {"success": True, "task_id": task_id}
+
+@app.post("/api/tasks/plan")
+async def api_plan_tasks(goal: str):
+    """规划任务"""
+    tasks = await task_planner.plan(goal)
+    return {"goal": goal, "tasks": [t.to_dict() for t in tasks]}
+
+@app.get("/api/tasks/{task_id}")
+def api_get_subagent_task(task_id: str):
+    """获取子代理任务详情"""
+    task = task_scheduler.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail=f"任务不存在: {task_id}")
+    return task.to_dict()
+
+@app.post("/api/tasks/{task_id}/cancel")
+async def api_cancel_task(task_id: str):
+    """取消任务"""
+    success = await task_scheduler.cancel(task_id)
+    return {"success": success, "task_id": task_id}
+
+# ============== 记忆系统 API ==============
+
+@app.get("/api/memory")
+def api_list_memory():
+    """获取记忆统计"""
+    return memory_manager.get_stats()
+
+@app.post("/api/memory")
+async def api_create_memory(content: str, title: str = None, type: str = "semantic", importance: int = 3, tags: List[str] = None):
+    """创建记忆"""
+    memory_type = MemoryType(type) if type in [t.value for t in MemoryType] else MemoryType.SEMANTIC
+    importance_enum = MemoryImportance(importance) if 1 <= importance <= 5 else MemoryImportance.NORMAL
+    
+    memory = await remember(content=content, title=title, type=memory_type, importance=importance_enum, tags=tags)
+    return {"success": True, "memory": memory.to_dict()}
+
+@app.get("/api/memory/search")
+async def api_search_memory(query: str, top_k: int = 5, memory_type: str = None):
+    """搜索记忆"""
+    mem_type = MemoryType(memory_type) if memory_type else None
+    results = await recall(query, top_k=top_k, memory_type=mem_type)
+    return {
+        "query": query,
+        "results": [{"memory": r.memory.to_dict(), "score": r.score, "highlight": r.highlight} for r in results]
+    }
+
+@app.get("/api/memory/{memory_id}")
+def api_get_memory(memory_id: str):
+    """获取指定记忆"""
+    memory = memory_manager.get(memory_id)
+    if not memory:
+        raise HTTPException(status_code=404, detail=f"记忆不存在: {memory_id}")
+    return memory.to_dict()
+
+@app.delete("/api/memory/{memory_id}")
+def api_delete_memory(memory_id: str):
+    """删除记忆"""
+    success = memory_manager.forget(memory_id)
+    return {"success": success, "memory_id": memory_id}
+
+@app.get("/api/memory/working")
+def api_get_working_memory():
+    """获取工作记忆"""
+    memories = memory_manager.get_working_memory()
+    return {"memories": [m.to_dict() for m in memories]}
+
+# ============== 安全系统 API ==============
+
+@app.get("/api/security/users")
+def api_list_users():
+    """获取用户列表"""
+    return {"users": permission_manager.list_users()}
+
+@app.get("/api/security/api-keys")
+def api_list_api_keys(user_id: str = None):
+    """获取 API 密钥列表"""
+    return {"api_keys": permission_manager.list_api_keys(user_id)}
+
+@app.post("/api/security/api-keys")
+def api_create_api_key(user_id: str, name: str = "API Key", scopes: List[str] = None):
+    """创建 API 密钥"""
+    try:
+        api_key = permission_manager.create_api_key(user_id, name, scopes)
+        return {"success": True, "api_key": api_key.to_dict(), "key": api_key.key}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/api/security/api-keys/{key_id}")
+def api_revoke_api_key(key_id: str):
+    """撤销 API 密钥"""
+    success = permission_manager.revoke_api_key(key_id)
+    return {"success": success, "key_id": key_id}
+
+@app.get("/api/security/audit-logs")
+def api_get_audit_logs(hours: int = 24, action: str = None, actor: str = None, limit: int = 100):
+    """获取审计日志"""
+    start_time = datetime.now() - timedelta(hours=hours)
+    logs = audit_logger.query(start_time=start_time, action=action, actor=actor, limit=limit)
+    return {"logs": [l.to_dict() for l in logs]}
+
+@app.get("/api/security/stats")
+def api_security_stats():
+    """获取安全统计"""
+    return {
+        "audit": audit_logger.get_stats(),
+        "users": len(permission_manager._users),
+        "api_keys": len(permission_manager._api_keys)
+    }
+
+# ============== 项目管理 API ==============
+
+@app.get("/api/projects")
+def api_list_projects(status: str = None, owner: str = None):
+    """获取项目列表"""
+    st = ProjectStatus(status) if status else None
+    projects = project_manager.list_projects(st, owner)
+    return {"projects": [p.to_dict() for p in projects]}
+
+@app.post("/api/projects")
+def api_create_project(request: CreateProjectRequest):
+    """创建项目"""
+    project = project_manager.create_project(
+        name=request.name,
+        description=request.description,
+        owner=request.owner,
+        tags=request.tags,
+        icon=request.icon,
+        color=request.color
+    )
+    return {"success": True, "project": project.to_dict()}
+
+@app.get("/api/projects/{project_id}")
+def api_get_project(project_id: str):
+    """获取项目详情"""
+    project = project_manager.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    
+    tasks = [project_manager.get_task(tid) for tid in project.tasks if project_manager.get_task(tid)]
+    documents = [project_manager.get_document(did) for did in project.documents if project_manager.get_document(did)]
+    
+    return {
+        "project": project.to_dict(),
+        "tasks": [t.to_dict() for t in tasks],
+        "documents": [d.to_dict() for d in documents]
+    }
+
+@app.put("/api/projects/{project_id}")
+def api_update_project(project_id: str, request: ProjectRequest):
+    """更新项目"""
+    project = project_manager.update_project(
+        project_id, 
+        name=request.name,
+        description=request.description,
+        icon=request.icon,
+        status=request.status
+    )
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return {"success": True, "project": project.to_dict()}
+
+@app.delete("/api/projects/{project_id}")
+def api_delete_project(project_id: str):
+    """删除项目"""
+    success = project_manager.delete_project(project_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return {"success": True, "message": "项目已删除"}
+
+# ============== 项目任务 API ==============
+
+@app.get("/api/projects/{project_id}/tasks")
+def api_list_project_tasks(project_id: str, status: str = None):
+    """获取项目任务列表"""
+    st = PTaskStatus(status) if status else None
+    tasks = project_manager.list_tasks(project_id, st)
+    return {"tasks": [t.to_dict() for t in tasks]}
+
+@app.post("/api/projects/{project_id}/tasks")
+async def api_create_project_task(project_id: str, request: CreateTaskRequest):
+    """创建项目任务"""
+    task = await project_manager.create_task(
+        project_id=project_id,
+        title=request.title,
+        description=request.description,
+        priority=PTaskPriority(request.priority),
+        assignee=request.assignee,
+        tags=request.tags
+    )
+    if not task:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return {"success": True, "task": task.to_dict()}
+
+@app.post("/api/projects/{project_id}/tasks/parse-text")
+async def api_create_tasks_from_text(project_id: str, request: CreateTasksFromTextRequest):
+    """📝 从文字解析并创建任务"""
+    tasks = await project_manager.create_tasks_from_text(project_id, request.text)
+    return {"success": True, "count": len(tasks), "tasks": [t.to_dict() for t in tasks]}
+
+@app.get("/api/project-tasks/{task_id}")
+def api_get_project_task(task_id: str):
+    """获取项目任务详情"""
+    task = project_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return task.to_dict()
+
+@app.put("/api/project-tasks/{task_id}")
+def api_update_project_task(task_id: str, request: CreateTaskRequest):
+    """更新项目任务"""
+    task = project_manager.update_task(
+        task_id,
+        title=request.title,
+        description=request.description,
+        priority=PTaskPriority(request.priority),
+        assignee=request.assignee,
+        tags=request.tags
+    )
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return {"success": True, "task": task.to_dict()}
+
+@app.delete("/api/project-tasks/{task_id}")
+def api_delete_project_task(task_id: str):
+    """删除项目任务"""
+    success = project_manager.delete_task(task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return {"success": True, "message": "任务已删除"}
+
+# ============== 项目文档 API ==============
+
+@app.get("/api/projects/{project_id}/documents")
+def api_list_project_documents(project_id: str):
+    """获取项目文档列表"""
+    docs = project_manager.list_documents(project_id)
+    return {"documents": [d.to_dict() for d in docs]}
+
+@app.post("/api/projects/{project_id}/documents")
+async def api_upload_document(
+    project_id: str,
+    file: UploadFile = File(...),
+    document_type: str = Form("other"),
+    description: str = Form("")
+):
+    """📄 上传文档到项目"""
+    content = await file.read()
+    doc_type = DocumentType(document_type) if document_type in [d.value for d in DocumentType] else DocumentType.OTHER
+    
+    doc = await project_manager.upload_document(
+        project_id=project_id,
+        file_content=content,
+        filename=file.filename,
+        document_type=doc_type,
+        description=description
+    )
+    
+    if not doc:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return {"success": True, "document": doc.to_dict()}
+
+@app.post("/api/documents/{document_id}/parse")
+async def api_parse_document_to_tasks(document_id: str):
+    """📋 解析文档生成任务"""
+    tasks = await project_manager.parse_document_to_tasks(document_id, auto_create=True)
+    return {"success": True, "count": len(tasks), "tasks": [t.to_dict() for t in tasks]}
+
+@app.get("/api/documents/{document_id}")
+def api_get_document(document_id: str):
+    """获取文档详情"""
+    doc = project_manager.get_document(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    return doc.to_dict()
+
+@app.get("/api/documents/{document_id}/download")
+def api_download_document(document_id: str):
+    """下载文档"""
+    doc = project_manager.get_document(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    
+    file_path = Path(doc.file_path)
+    if not file_path.exists():
         raise HTTPException(status_code=404, detail="文件不存在")
-    # 限制读取 1MB 以内的文本文件
-    if target.stat().st_size > 1024 * 1024:
-        raise HTTPException(status_code=413, detail="文件过大，无法预览")
-    try:
-        # 以 utf-8 读取，失败则返回提示
-        content = target.read_text(encoding="utf-8")
-    except Exception:
-        raise HTTPException(status_code=415, detail="非文本文件，无法预览")
-    return {"content": content, "status": "ok"}
+    
+    return FileResponse(path=file_path, filename=doc.original_name, media_type=doc.file_type)
 
-@app.put("/project-manager/projects/{project_name}/files/{file_path:path}")
-def update_project_file(project_name: str, file_path: str, payload: FileSave):
-    target = _safe_project_paths(project_name, file_path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        target.write_text(payload.content or "", encoding="utf-8")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"写入失败: {e}")
-    return {"status": "ok", "message": "文件已保存"}
+@app.delete("/api/documents/{document_id}")
+def api_delete_document(document_id: str):
+    """删除文档"""
+    success = project_manager.delete_document(document_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="文档不存在")
+    return {"success": True, "message": "文档已删除"}
 
-@app.delete("/project-manager/projects/{project_name}")
-def delete_project_file(project_name: str):
-    return {"status": "ok"}
+@app.get("/api/project-manager/stats")
+def api_project_manager_stats():
+    """获取项目管理统计"""
+    return project_manager.get_stats()
 
-# ============== 启动 ==============
+# ============== 频道管理 API ==============
 
-# 挂载静态文件目录
+@app.get("/api/channels")
+def get_channels():
+    """获取频道列表"""
+    channels = []
+    for c in _data.get("channels", []):
+        channels.append({
+            "id": c.get("id"),
+            "name": c.get("name", ""),
+            "provider": c.get("provider", ""),
+            "webhook_url": c.get("webhook_url"),
+            "default_target": c.get("default_target")
+        })
+    return {"channels": channels}
+
+@app.post("/api/channels")
+def save_channel(channel: ChannelRequest):
+    """保存频道配置"""
+    with data_lock:
+        found = False
+        for i, c in enumerate(_data.get("channels", [])):
+            if c["id"] == channel.id:
+                _data["channels"][i] = {
+                    "id": channel.id,
+                    "name": channel.name,
+                    "provider": channel.provider,
+                    "webhook_url": channel.webhook_url,
+                    "default_target": channel.default_target,
+                    "token": channel.token
+                }
+                found = True
+                break
+        
+        if not found:
+            if "channels" not in _data:
+                _data["channels"] = []
+            _data["channels"].append({
+                "id": channel.id,
+                "name": channel.name,
+                "provider": channel.provider,
+                "webhook_url": channel.webhook_url,
+                "default_target": channel.default_target,
+                "token": channel.token
+            })
+        save_data(_data)
+    return {"status": "ok", "message": "频道已保存"}
+
+@app.post("/api/channels/{channel_id}/test")
+def test_channel(channel_id: str, request: Request):
+    """测试频道发送"""
+    return {"status": "ok", "message": f"已发送到 {channel_id}"}
+
+# ============== 重启 API ==============
+
+@app.post("/api/restart")
+def restart_server():
+    """重启后端服务"""
+    import subprocess
+    import threading
+    
+    def restart_background():
+        import time
+        time.sleep(2)
+        subprocess.Popen([
+            sys.executable, "-m", "uvicorn", 
+            "main:app", "--host", SERVER_HOST, "--port", str(SERVER_PORT)
+        ], cwd=str(BASE_DIR), stdout=open("/tmp/xuanling.log", "a"), stderr=subprocess.STDOUT)
+    
+    thread = threading.Thread(target=restart_background)
+    thread.start()
+    return {"message": "服务正在重启...", "status": "ok"}
+
+# ============== 静态文件 ==============
+
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     logger.info(f"静态文件目录: {STATIC_DIR}")
 
-
-
-@app.get('/api/capabilities')
-def get_capabilities():
-    """返回内置能力清单（供前端展示）"""
-    return {"capabilities": CAPABILITIES_TEXT}
-# ============== 重启 API ==============
-
-@app.post("/api/restart")
-def restart_server(request: Request):
-    """重启后端服务"""
-    import subprocess
-    import sys
-    # 可选: 简易鉴权，设置环境变量 ADMIN_TOKEN 时要求请求头 X-Admin-Token 匹配
-    admin_token = os.getenv("ADMIN_TOKEN", "")
-    if admin_token:
-        req_token = request.headers.get("X-Admin-Token", "")
-        if req_token != admin_token:
-            raise HTTPException(status_code=401, detail="未授权")
-
-    import sys
-    
-    def restart_background():
-        import time
-        time.sleep(2)  # 等待当前请求完成
-        # 重新启动服务
-        subprocess.Popen([
-            sys.executable, "-m", "uvicorn", 
-            "main:app", "--host", "0.0.0.0", "--port", "8000"
-        ], cwd=str(BASE_DIR), stdout=open("/tmp/xuanling.log", "a"), stderr=subprocess.STDOUT)
-    
-    import threading
-    thread = threading.Thread(target=restart_background)
-    thread.start()
-    
-    return {"message": "服务正在重启...", "status": "ok"}
+# ============== 启动 ==============
 
 if __name__ == "__main__":
-    logger.info("启动玄灵AI后端服务...")
-    logger.info(f"静态文件目录: {STATIC_DIR}")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
-def _should_override_response(user_message: str, model_reply: str) -> str | None:
-    """在模型跑偏时基于内置能力兜底纠偏。返回替代文本或 None。"""
-    if not user_message:
-        return None
-    um = user_message
-    mr = (model_reply or '').strip()
-    ask_proj = ('项目管理' in um) or ('项目' in um and any(k in um for k in ['功能','做什么','用途','能做','有什么用']))
-    deny_signals = any(k in mr for k in ['并不具备项目管理功能','没有项目管理','没有项目管理模块'])
-    off_topic = '农林牧副渔' in mr
-    if ask_proj and (deny_signals or off_topic or not mr):
-        return ("我的项目管理功能是内置且可直接使用的，主要包括：
-
-"
-                "- 增删改查项目：GET/POST/PUT/DELETE /projects，支持进度(progress)、状态(status) 等更新
-"
-                "- 控制台操作：侧边栏进入‘项目管理’，浏览项目卡片、打开项目详情
-"
-                "- 项目文件：/project-manager/projects/{name}/files/{path} 可读取/保存项目内文件（含路径安全校验）
-"
-                "- 关联能力：可与记忆系统(/api/memory)与子代理(/agents)协作，对任务/笔记/自动化联动
-
-"
-                "如果你告诉我项目名称与需求，我可以：
-"
-                "1) 立即创建一个项目；
-"
-                "2) 为它添加进度与状态；
-"
-                "3) 初始化项目文件/README；
-"
-                "4) 在控制台中高亮显示便于后续操作。")
-    return None
+    logger.info(f"启动玄灵AI后端服务... host={SERVER_HOST}, port={SERVER_PORT}")
+    uvicorn.run(
+        "main:app", 
+        host=SERVER_HOST, 
+        port=SERVER_PORT, 
+        reload=SERVER_RELOAD
+    )

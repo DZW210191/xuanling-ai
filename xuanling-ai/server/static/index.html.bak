@@ -152,7 +152,6 @@
             <div class="nav-item" data-panel="skills" onclick="switchTo('skills')"><span>🛠️</span> 技能商店</div>
             <div class="nav-item" data-panel="settings" onclick="switchTo('settings')"><span>⚙️</span> 系统设置</div>
             <div class="nav-item" data-panel="local" onclick="switchTo('local')"><span>💻</span> 本地运行</div>
-            <div class="nav-item" data-panel="channels" onclick="switchTo('channels')"><span>📡</span> 频道配置</div>
         </div>
         
         <div class="main">
@@ -198,101 +197,8 @@
             
             <!-- 项目面板 -->
             <div class="panel" id="projects">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-                    <h2 class="panel-title" style="margin:0;">📁 项目管理</h2>
-                    <button onclick="showCreateProjectModal()" style="background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;padding:10px 20px;border-radius:8px;cursor:pointer;">➕ 新建项目</button>
-                </div>
-                <div class="projects-grid" id="projectsGrid">
-                    <div style="color:#666;padding:40px;text-align:center;grid-column:1/-1;">暂无项目，点击右上角创建</div>
-                </div>
-            </div>
-            
-            <!-- 项目详情面板 -->
-            <div class="panel" id="projectDetail">
-                <div style="display:flex;align-items:center;gap:15px;margin-bottom:15px;">
-                    <button onclick="switchTo('projects')" style="background:rgba(102,126,234,0.2);border:none;color:#a0aec0;padding:8px 15px;border-radius:6px;cursor:pointer;">← 返回</button>
-                    <h2 class="panel-title" style="margin:0;" id="projectDetailTitle">📁 项目详情</h2>
-                </div>
-                
-                <!-- 项目信息 -->
-                <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;margin-bottom:20px;">
-                    <div style="display:flex;justify-content:space-between;align-items:start;">
-                        <div>
-                            <div style="font-size:24px;margin-bottom:10px;" id="projectIcon">📁</div>
-                            <div style="font-size:18px;font-weight:bold;" id="projectName">项目名称</div>
-                            <div style="color:#a0aec0;font-size:14px;margin-top:5px;" id="projectDesc">项目描述</div>
-                        </div>
-                        <div style="text-align:right;">
-                            <div style="font-size:12px;color:#666;">进度</div>
-                            <div style="font-size:24px;font-weight:bold;color:#4ade80;" id="projectProgress">0%</div>
-                        </div>
-                    </div>
-                    <div style="margin-top:15px;display:flex;gap:10px;flex-wrap:wrap;" id="projectStats">
-                        <span style="background:rgba(102,126,234,0.2);padding:4px 12px;border-radius:15px;font-size:12px;color:#667eea;">📊 0 任务</span>
-                        <span style="background:rgba(74,222,128,0.2);padding:4px 12px;border-radius:15px;font-size:12px;color:#4ade80;">📄 0 文档</span>
-                    </div>
-                </div>
-                
-                <!-- 任务下达区域 -->
-                <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;margin-bottom:20px;">
-                    <div style="font-weight:bold;margin-bottom:15px;color:#667eea;">📝 文字下达任务</div>
-                    <textarea id="taskTextInput" placeholder="输入任务内容，例如：
-需要开发用户登录功能
-- 设计登录界面
-- 实现JWT认证
-紧急：修复安全漏洞
-优先：完成API文档" style="width:100%;height:100px;background:rgba(0,0,0,0.3);border:1px solid rgba(102,126,234,0.3);border-radius:8px;padding:12px;color:#fff;resize:vertical;font-size:14px;"></textarea>
-                    <div style="display:flex;gap:10px;margin-top:10px;">
-                        <button onclick="parseTextToTasks()" style="background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;padding:10px 20px;border-radius:8px;cursor:pointer;">📋 解析并创建任务</button>
-                        <button onclick="clearTaskInput()" style="background:rgba(102,126,234,0.2);border:none;color:#a0aec0;padding:10px 20px;border-radius:8px;cursor:pointer;">清空</button>
-                    </div>
-                </div>
-                
-                <!-- 文档上传区域 -->
-                <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;margin-bottom:20px;">
-                    <div style="font-weight:bold;margin-bottom:15px;color:#667eea;">📄 上传文档</div>
-                    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-                        <input type="file" id="documentFile" style="display:none;" onchange="handleFileSelect(event)">
-                        <button onclick="document.getElementById('documentFile').click()" style="background:rgba(102,126,234,0.3);border:1px dashed #667eea;color:#667eea;padding:15px 25px;border-radius:8px;cursor:pointer;">
-                            📎 选择文件
-                        </button>
-                        <select id="documentType" style="background:rgba(0,0,0,0.3);border:1px solid rgba(102,126,234,0.3);border-radius:6px;padding:8px 12px;color:#fff;">
-                            <option value="requirement">需求文档</option>
-                            <option value="design">设计文档</option>
-                            <option value="technical">技术文档</option>
-                            <option value="manual">手册</option>
-                            <option value="reference">参考资料</option>
-                            <option value="other">其他</option>
-                        </select>
-                        <input id="documentDesc" placeholder="文档描述（可选）" style="flex:1;min-width:150px;background:rgba(0,0,0,0.3);border:1px solid rgba(102,126,234,0.3);border-radius:6px;padding:8px 12px;color:#fff;">
-                        <button onclick="uploadDocument()" style="background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;padding:10px 20px;border-radius:8px;cursor:pointer;">📤 上传</button>
-                    </div>
-                    <div id="selectedFileName" style="margin-top:10px;color:#4ade80;font-size:13px;display:none;">已选择: <span id="fileNameDisplay"></span></div>
-                </div>
-                
-                <!-- 任务列表 -->
-                <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;margin-bottom:20px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
-                        <div style="font-weight:bold;color:#667eea;">✅ 任务列表</div>
-                        <select id="taskFilter" onchange="loadProjectTasks()" style="background:rgba(0,0,0,0.3);border:1px solid rgba(102,126,234,0.3);border-radius:6px;padding:5px 10px;color:#fff;font-size:12px;">
-                            <option value="">全部状态</option>
-                            <option value="pending">待处理</option>
-                            <option value="in_progress">进行中</option>
-                            <option value="completed">已完成</option>
-                        </select>
-                    </div>
-                    <div id="projectTasksList" style="max-height:300px;overflow-y:auto;">
-                        <div style="color:#666;text-align:center;padding:20px;">暂无任务</div>
-                    </div>
-                </div>
-                
-                <!-- 文档列表 -->
-                <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;">
-                    <div style="font-weight:bold;margin-bottom:15px;color:#667eea;">📚 文档列表</div>
-                    <div id="projectDocsList" style="max-height:200px;overflow-y:auto;">
-                        <div style="color:#666;text-align:center;padding:20px;">暂无文档</div>
-                    </div>
-                </div>
+                <h2 class="panel-title">📁 项目管理</h2>
+                <div class="projects-grid" id="projectsGrid"></div>
             </div>
             
             <!-- 子代理面板 -->
@@ -364,26 +270,6 @@
             <div class="panel" id="local">
                 <h2 class="panel-title">💻 本地运行状态</h2>
                 <div id="localStatus" style="color:#666;padding:20px;">加载中...</div>
-            </div>
-            
-            <!-- 频道配置面板 -->
-            <div class="panel" id="channels">
-                <h2 class="panel-title">📡 频道配置</h2>
-                <div id="channelsList" style="margin-bottom:10px;color:#a0aec0;">加载中...</div>
-                <div class="form-group"><label class="form-label">新建/更新频道</label>
-                    <input id="chanId" class="form-input" placeholder="id(唯一) - 如 feishu-main">
-                    <input id="chanName" class="form-input" placeholder="名称 - 飞书主群">
-                    <input id="chanProvider" class="form-input" placeholder="提供商 - feishu|wecom|slack|discord|telegram|webhook">
-                    <input id="chanWebhook" class="form-input" placeholder="Webhook URL (可选)">
-                    <input id="chanTarget" class="form-input" placeholder="默认目标(可选)">
-                    <input id="chanToken" type="password" class="form-input" placeholder="Token(仅本机保存，不落盘)">
-                    <button class="save-btn" onclick="saveChannel()">保存频道</button>
-                </div>
-                <div class="form-group"><label class="form-label">测试发送</label>
-                    <input id="chanTestId" class="form-input" placeholder="频道 id">
-                    <input id="chanTestText" class="form-input" placeholder="文本">
-                    <button class="save-btn" onclick="testChannelSend()">发送测试</button>
-                </div>
             </div>
         </div>
     </div>
@@ -544,7 +430,7 @@
             if (panelId === 'memory') loadMemories();
             if (panelId === 'settings') loadSettings();
             if (panelId === 'skills') loadSkills();
-            if (panelId === 'local') loadLocalStatus(); if (panelId === 'channels') loadChannels();
+            if (panelId === 'local') loadLocalStatus();
         }
         let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
         
@@ -629,7 +515,7 @@
                     if (panelId === 'memory') loadMemories();
                     if (panelId === 'settings') loadSettings();
                     if (panelId === 'skills') loadSkills();
-                    if (panelId === 'local') loadLocalStatus(); if (panelId === 'channels') loadChannels();
+                    if (panelId === 'local') loadLocalStatus();
                 });
             });
         });
@@ -758,12 +644,25 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// 旧的 loadProjects 已移除，使用文件末尾的新版本
-
-// 项目点击 - 显示详情弹窗
-let currentEditingFile = null;
-
-// 旧的 showProjectDetail 已移除，使用新版本
+async function loadProjects() {
+            try {
+                const resp = await fetch(API_BASE + '/project-manager/projects');
+                const data = await resp.json();
+                allProjects = data.projects || [];
+                const grid = document.getElementById('projectsGrid');
+                if (allProjects.length === 0) {
+                    grid.innerHTML = '<div style="color:#666;padding:40px;text-align:center;">暂无项目<br><br><button onclick="showCreateProject()" style="background:rgba(102,126,234,0.3);border:none;color:#667eea;padding:10px 20px;border-radius:6px;cursor:pointer;">➕ 创建第一个项目</button></div>';
+                    return;
+                }
+                grid.innerHTML = allProjects.map(p => '<div class="project-card" data-name="' + p.name + '"><div class="project-icon">📁</div><div class="project-name">' + p.name + '</div><div class="project-desc">' + (p.description || '暂无描述') + '</div></div>').join('') + '<div class="add-card" onclick="showCreateProject()"><span>+</span><p>添加项目</p></div>';
+            } catch (e) { 
+                console.error(e); 
+                document.getElementById('projectsGrid').innerHTML = '<div style="color:#ef4444;padding:20px;">无法加载项目</div>';
+            }
+        }
+        
+        // 项目点击 - 显示详情弹窗
+        let currentEditingFile = null;
         
         async function showProjectDetail(projectName) {
             const project = allProjects.find(p => p.name === projectName);
@@ -991,7 +890,7 @@ let currentEditingFile = null;
             if (!name) return;
             
             try {
-                await fetch(API_BASE + '/projects', {
+                await fetch(API_BASE + '/projects/json', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({name, description: desc})
@@ -1195,12 +1094,11 @@ let currentEditingFile = null;
             if (!title) return;
             const content = prompt('记忆内容:');
             const tags = prompt('标签 (逗号分隔):');
-            const tagsArray = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [];
             
-            fetch(API_BASE + '/memory', {
+            fetch(API_BASE + '/memory/json', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({title, content: content || '', tags: tagsArray})
+                body: JSON.stringify({title, content: content || '', tags: tags || ''})
             }).then(() => loadMemories()).catch(e => alert('添加失败: ' + e.message));
         }
         
@@ -1215,10 +1113,10 @@ let currentEditingFile = null;
                 if (!newTitle) return;
                 // 删除旧的添加新的
                 fetch(API_BASE + '/memory/' + id, { method: 'DELETE' })
-                    .then(() => fetch(API_BASE + '/memory', {
+                    .then(() => fetch(API_BASE + '/memory/json', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({title: newTitle, content: newContent || '', tags: []})
+                        body: JSON.stringify({title: newTitle, content: newContent || '', tags: ''})
                     }))
                     .then(() => loadMemories())
                     .catch(e => alert('编辑失败: ' + e.message));
@@ -1229,6 +1127,34 @@ let currentEditingFile = null;
                     .then(() => loadMemories())
                     .catch(e => alert('删除失败: ' + e.message));
             }
+        }
+        
+        function saveSettings() { 
+            const apiUrl = document.getElementById('apiUrl').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const modelName = document.getElementById('modelName').value;
+            
+            // 保存到本地
+            localStorage.setItem('xuanling_settings', JSON.stringify({apiUrl, apiKey, modelName}));
+            
+            // 发送到后端保存
+            fetch(API_BASE + '/config', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    api_url: apiUrl,
+                    api_key: apiKey,
+                    model: modelName
+                })
+            }).then(r => r.json()).then(data => {
+                if (data.status === 'ok') {
+                    alert('✅ 设置已保存并生效！');
+                } else {
+                    alert('⚠️ 本地保存成功，但后端更新失败: ' + (data.message || ''));
+                }
+            }).catch(e => {
+                alert('⚠️ 本地保存成功，但后端连接失败: ' + e.message);
+            });
         }
         
         // 加载后端配置和模型列表
@@ -1390,147 +1316,76 @@ let currentEditingFile = null;
         async function loadLocalStatus() {
             const statusDiv = document.getElementById('localStatus');
             const apiBase = window.location.origin;
+            
             try {
-                // 并发拉取状态
-                const [healthResp, configResp, modelsResp, tasksResp, monitorResp, logsResp] = await Promise.all([
-                    fetch(apiBase + '/health'),
-                    fetch(apiBase + '/config'),
-                    fetch(apiBase + '/models'),
-                    fetch(apiBase + '/bg-tasks'),
-                    fetch(apiBase + '/api/monitor'),
-                    fetch(apiBase + '/api/logs?lines=80')
-                ]);
-                const [health, config, modelsData, tasksData, monitorData, logsHtml] = [
-                    await healthResp.json(),
-                    await configResp.json(),
-                    await modelsResp.json(),
-                    await tasksResp.json(),
-                    await monitorResp.json(),
-                    await logsResp.text()
-                ];
-                const steps = [
-                    health && health.status === 'ok' ? '健康检查 OK' : '健康检查失败',
-                    config ? '读取配置 OK' : '配置读取失败',
-                    modelsData ? '模型信息 OK' : '模型信息失败',
-                    tasksData ? `后台任务 ${tasksData.tasks ? tasksData.tasks.length : 0} 条` : '后台任务读取失败'
-                ];
-                const cpu = monitorData.cpu, mem = monitorData.memory, apiUsage = monitorData.api_usage, activeTasks = monitorData.tasks_active;
-                const now = new Date().toLocaleString();
-                const listenUrl = apiBase;
+                // 检查后端健康状态
+                const resp = await fetch(apiBase + '/health');
+                const health = await resp.json();
+                
+                // 获取配置
+                const configResp = await fetch(apiBase + '/config');
+                const config = await configResp.json();
+                
+                // 获取模型列表
+                const modelsResp = await fetch(apiBase + '/models');
+                const modelsData = await modelsResp.json();
+                
+                // 获取后台任务
+                const tasksResp = await fetch(apiBase + '/bg-tasks');
+                const tasksData = await tasksResp.json();
+                
+                const currentModel = modelsData.current || {};
+                
                 statusDiv.innerHTML = `
-                    <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:900px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <h3 style="color:#4ade80;margin:0;">✅ 服务运行中</h3>
-                            <div style="font-size:12px;color:#a0aec0;">上次检查：${now}</div>
+                    <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:600px;">
+                        <h3 style="color:#4ade80;margin-bottom:15px;">✅ 服务运行中</h3>
+                        <div style="margin:15px 0;">
+                            <div style="color:#a0aec0;margin-bottom:5px;">API 地址</div>
+                            <div style="color:#fff;">${config.api_url || '未配置'}</div>
                         </div>
-                        <div style="margin-top:12px;color:#a0aec0;">监听地址：<span style="color:#fff;">${listenUrl}</span></div>
-                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:15px 0;">
-                            <div style="background:rgba(74,222,128,0.15);padding:12px;border-radius:8px;text-align:center;">
-                                <div style="color:#4ade80;font-weight:bold;font-size:18px;">${cpu}%</div><div style="font-size:12px;color:#a0aec0;">CPU</div>
-                            </div>
-                            <div style="background:rgba(102,126,234,0.15);padding:12px;border-radius:8px;text-align:center;">
-                                <div style="color:#667eea;font-weight:bold;font-size:18px;">${mem}%</div><div style="font-size:12px;color:#a0aec0;">内存</div>
-                            </div>
-                            <div style="background:rgba(248,113,113,0.15);padding:12px;border-radius:8px;text-align:center;">
-                                <div style="color:#f87171;font-weight:bold;font-size:18px;">${activeTasks}</div><div style="font-size:12px;color:#a0aec0;">活跃任务</div>
-                            </div>
-                            <div style="background:rgba(234,179,8,0.15);padding:12px;border-radius:8px;text-align:center;">
-                                <div style="color:#eab308;font-weight:bold;font-size:18px;">${apiUsage}%</div><div style="font-size:12px;color:#a0aec0;">API 使用</div>
-                            </div>
+                        <div style="margin:15px 0;">
+                            <div style="color:#a0aec0;margin-bottom:5px;">当前模型</div>
+                            <div style="color:#fff;">${config.model || '未设置'}</div>
                         </div>
-                        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;">
-                            <div>
-                                <div style="color:#a0aec0;margin-bottom:5px;">API 地址</div>
-                                <div style="color:#fff;word-break:break-all;">${config.api_url || '未配置'}</div>
-                            </div>
-                            <div>
-                                <div style="color:#a0aec0;margin-bottom:5px;">当前模型</div>
-                                <div style="color:#fff;">${config.model || '未设置'}</div>
-                            </div>
-                            <div>
-                                <div style="color:#a0aec0;margin-bottom:5px;">供应商</div>
-                                <div style="color:#fff;">${config.provider || '未知'}</div>
-                            </div>
+                        <div style="margin:15px 0;">
+                            <div style="color:#a0aec0;margin-bottom:5px;">服务供应商</div>
+                            <div style="color:#fff;">${config.provider || '未知'}</div>
                         </div>
-                        <div style="margin-top:12px;color:#a0aec0;">执行步骤</div>
-                        <ul style="margin:6px 0 12px 18px;color:#e2e8f0;">
-                            ${steps.map(s => `<li>${s}</li>`).join('')}
-                        </ul>
-                        <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
-                            <button id="btnLocalRefresh" class="save-btn" style="background:rgba(102,126,234,0.5);">🔄 刷新</button>
-                            <button id="btnLocalAuto" class="save-btn" style="background:rgba(102,126,234,0.3);">⏱️ 自动刷新</button>
-                            <input id="adminTokenInput" type="password" placeholder="管理令牌 (可选)" style="flex:1;min-width:220px;padding:10px 14px;border:1px solid rgba(102,126,234,0.3);border-radius:8px;background:rgba(0,0,0,0.3);color:#fff;">
-                            <button id="btnSaveToken" class="save-btn" style="background:rgba(74,222,128,0.4);">🔐 保存令牌</button>
-                            <button id="btnRestart" class="save-btn" style="background:#ef4444;">🔁 重启服务</button>
+                        <div style="margin:15px 0;">
+                            <div style="color:#a0aec0;margin-bottom:5px;">后台任务</div>
+                            <div style="color:#fff;">${tasksData.tasks ? tasksData.tasks.length : 0} 个任务</div>
                         </div>
-                        <div style="margin-top:12px;color:#a0aec0;">后端日志 (尾部)</div>
-                        <pre id="logTail" style="background:#0d1117;color:#9ca3af;padding:12px;border-radius:8px;max-height:240px;overflow:auto;">${logsHtml.replace(/</g,'&lt;')}</pre>
-                        <div style="margin-top:12px;color:#a0aec0;">快速命令</div>
-                        <pre style="background:#0d1117;padding:12px;border-radius:8px;overflow:auto;font-size:13px;line-height:1.6;"># 查看日志（浏览器）
-curl ${listenUrl}/api/logs
-
-# 重启服务（如配置了管理令牌）
-curl -X POST ${listenUrl}/api/restart -H "X-Admin-Token: <token>"</pre>
-                    </div>
-                `;
-                // 绑定交互
-                const btnRefresh = document.getElementById('btnLocalRefresh');
-                const btnAuto = document.getElementById('btnLocalAuto');
-                const btnRestart = document.getElementById('btnRestart');
-                const btnSaveToken = document.getElementById('btnSaveToken');
-                const adminTokenInput = document.getElementById('adminTokenInput');
-                // 载入已保存的令牌
-                try { adminTokenInput.value = localStorage.getItem('xuan_admin_token') || ''; } catch(_) {}
-                btnRefresh.addEventListener('click', () => loadLocalStatus());
-                btnAuto.addEventListener('click', () => {
-                    if (window._localRefresh) {
-                        clearInterval(window._localRefresh); window._localRefresh = null; btnAuto.textContent = '⏱️ 自动刷新';
-                    } else {
-                        window._localRefresh = setInterval(() => {
-                            // 仅在“本地运行”面板可见时刷新
-                            const panel = document.getElementById('local');
-                            if (panel && panel.classList.contains('active')) { loadLocalStatus(); } else { clearInterval(window._localRefresh); window._localRefresh = null; }
-                        }, 5000);
-                        btnAuto.textContent = '⏸️ 停止自动刷新';
-                    }
-                });
-                btnSaveToken.addEventListener('click', () => {
-                    try { localStorage.setItem('xuan_admin_token', adminTokenInput.value || ''); alert('已保存管理令牌（仅保存在本机浏览器）'); } catch(e) { alert('保存失败: '+e.message); }
-                });
-                btnRestart.addEventListener('click', async () => {
-                    if (!confirm('确定重启后端服务？')) return;
-                    const headers = {'Content-Type': 'application/json'};
-                    const t = (localStorage.getItem('xuan_admin_token') || '').trim();
-                    if (t) headers['X-Admin-Token'] = t;
-                    try {
-                        const resp = await fetch(apiBase + '/api/restart', {method:'POST', headers});
-                        const data = await resp.json();
-                        alert(data.message || '已发起重启');
-                        setTimeout(() => location.reload(), 3000);
-                    } catch (e) { alert('重启请求失败: ' + e.message); }
-                });
-            } catch (e) {
-                const now = new Date().toLocaleString();
-                statusDiv.innerHTML = `
-                    <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:900px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <h3 style="color:#ef4444;margin:0;">❌ 服务未运行</h3>
-                            <div style="font-size:12px;color:#a0aec0;">上次检查：${now}</div>
-                        </div>
-                        <p style="color:#a0aec0;margin:10px 0 15px;">无法连接到后端服务，请确保服务已启动。</p>
-                        <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow:auto;font-size:13px;line-height:1.6;"># 启动服务（uvicorn）
-cd /root/.openclaw/workspace/xuanling-ai/server
-uvicorn main:app --host 0.0.0.0 --port 8000
-
+                        
+                        <h3 style="color:#667eea;margin:20px 0 15px;">快速命令</h3>
+                        <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.6;">
 # 查看日志
-curl http://127.0.0.1:8000/api/logs</pre>
-                        <button id="btnLocalRetry" class="save-btn" style="margin-top:10px;">重试</button>
+tail -f /tmp/xuanling.log
+
+# 重启服务
+python3 /root/.openclaw/workspace/xuanling/src/main.py
+
+# Docker 部署
+docker build -t xuanling-ai /root/.openclaw/workspace/xuanling/
+docker run -d -p 8000:8000 -e API_KEY=xxx xuanling-ai</pre>
                     </div>
                 `;
-                const retry = document.getElementById('btnLocalRetry');
-                if (retry) retry.addEventListener('click', () => loadLocalStatus());
+            } catch (e) {
+                statusDiv.innerHTML = `
+                    <div style="background:rgba(0,0,0,0.3);padding:20px;border-radius:12px;max-width:600px;">
+                        <h3 style="color:#ef4444;margin-bottom:15px;">❌ 服务未运行</h3>
+                        <p style="color:#a0aec0;margin-bottom:15px;">无法连接到后端服务，请确保服务已启动。</p>
+                        <pre style="background:#0d1117;padding:15px;border-radius:8px;overflow-x:auto;font-size:13px;line-height:1.6;">
+# 启动服务
+cd /root/.openclaw/workspace/xuanling
+python3 src/main.py
+
+# 或使用 Docker
+docker run -d -p 8000:8000 xuanling-ai</pre>
+                    </div>
+                `;
             }
         }
+        
         function closeSkillDetail() {
             document.getElementById('skillDetail').classList.remove('show');
         }
@@ -1546,337 +1401,7 @@ curl http://127.0.0.1:8000/api/logs</pre>
         if (savedSettings.modelName) document.getElementById('modelName').value = savedSettings.modelName;
         
         // 初始化 - 立即执行
-        loadProjects(); loadMemories(); loadChannels();
-    
-        // 频道管理
-        async function loadChannels() {
-            const list = document.getElementById('channelsList');
-            if (!list) return;
-            try {
-                const resp = await fetch(API_BASE + '/api/channels');
-                const data = await resp.json();
-                const arr = data.channels || [];
-                list.innerHTML = arr.length ? arr.map(c => `• ${c.id} [${c.provider}] ${c.name} ${c.webhook_url?'(webhook)':''}`).join('<br>') : '暂无频道';
-            } catch(e){ list.innerHTML = '加载失败: '+e.message; }
-        }
-        async function saveChannel(){
-            const body = {
-                id: document.getElementById('chanId').value.trim(),
-                name: document.getElementById('chanName').value.trim(),
-                provider: document.getElementById('chanProvider').value.trim(),
-                webhook_url: document.getElementById('chanWebhook').value.trim()||null,
-                default_target: document.getElementById('chanTarget').value.trim()||null,
-                token: document.getElementById('chanToken').value
-            };
-            const resp = await fetch(API_BASE + '/api/channels', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
-            const data = await resp.json();
-            alert('保存成功'); loadChannels();
-        }
-        async function testChannelSend(){
-            const id = document.getElementById('chanTestId').value.trim();
-            const text = document.getElementById('chanTestText').value.trim()||'hello';
-            const resp = await fetch(API_BASE + '/api/channels/'+encodeURIComponent(id)+'/test', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({text})});
-            const data = await resp.json();
-            alert('发送结果: '+JSON.stringify(data));
-        }
-
-// ============== 项目管理新功能 ==============
-// currentProjectId 已在上面声明
-let selectedFile = null;
-
-// 显示创建项目模态框
-function showCreateProjectModal() {
-    document.getElementById('newProjectName').value = '';
-    document.getElementById('newProjectDesc').value = '';
-    document.getElementById('addProjectModal').classList.add('show');
-}
-
-// 确认创建项目
-async function confirmAddProject() {
-    const name = document.getElementById('newProjectName').value.trim();
-    const desc = document.getElementById('newProjectDesc').value.trim();
-    
-    if (!name) {
-        alert('请输入项目名称');
-        return;
-    }
-    
-    try {
-        const resp = await fetch(API_BASE + '/api/projects', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, description: desc, icon: '📁' })
-        });
-        const data = await resp.json();
-        
-        if (data.success) {
-            closeModal();
-            loadProjects();
-            alert('项目创建成功！');
-        } else {
-            alert('创建失败: ' + (data.detail || JSON.stringify(data)));
-        }
-    } catch (e) {
-        alert('创建失败: ' + e.message);
-    }
-}
-
-// 加载项目列表
-async function loadProjects() {
-    const grid = document.getElementById('projectsGrid');
-    grid.innerHTML = '<div style="color:#666;padding:40px;text-align:center;">加载中...</div>';
-    
-    try {
-        const resp = await fetch(API_BASE + '/api/projects');
-        const data = await resp.json();
-        const projects = data.projects || [];
-        
-        if (projects.length === 0) {
-            grid.innerHTML = '<div style="color:#666;padding:40px;text-align:center;grid-column:1/-1;">暂无项目，点击右上角创建</div>';
-            return;
-        }
-        
-        grid.innerHTML = projects.map(p => 
-            '<div class="project-card" onclick="openProjectDetail(\'' + p.id + '\')">' +
-            '<div class="project-icon">' + (p.icon || '📁') + '</div>' +
-            '<div class="project-name">' + p.name + '</div>' +
-            '<div class="project-desc">' + (p.description || '暂无描述') + '</div>' +
-            '<div class="project-status">' + (p.status || 'draft') + '</div>' +
-            '</div>'
-        ).join('');
-    } catch (e) {
-        grid.innerHTML = '<div style="color:#ef4444;padding:20px;">加载失败: ' + e.message + '</div>';
-    }
-}
-
-// 打开项目详情
-async function openProjectDetail(projectId) {
-    currentProjectId = projectId;
-    
-    try {
-        const resp = await fetch(API_BASE + '/api/projects/' + projectId);
-        const data = await resp.json();
-        
-        const project = data.project || {};
-        
-        document.getElementById('projectDetailTitle').textContent = project.icon + ' ' + project.name;
-        document.getElementById('projectIcon').textContent = project.icon || '📁';
-        document.getElementById('projectName').textContent = project.name;
-        document.getElementById('projectDesc').textContent = project.description || '暂无描述';
-        document.getElementById('projectProgress').textContent = Math.round((project.progress || 0) * 100) + '%';
-        
-        const stats = project.stats || {};
-        document.getElementById('projectStats').innerHTML = 
-            '<span style="background:rgba(102,126,234,0.2);padding:4px 12px;border-radius:15px;font-size:12px;color:#667eea;">📊 ' + (stats.total_tasks || 0) + ' 任务</span>' +
-            '<span style="background:rgba(74,222,128,0.2);padding:4px 12px;border-radius:15px;font-size:12px;color:#4ade80;">📄 ' + (stats.total_documents || 0) + ' 文档</span>' +
-            '<span style="background:rgba(251,191,36,0.2);padding:4px 12px;border-radius:15px;font-size:12px;color:#fbbf24;">✅ ' + (stats.completed_tasks || 0) + ' 完成</span>';
-        
-        // 加载任务和文档
-        loadProjectTasks();
-        loadProjectDocs();
-        
-        // 切换到详情面板
-        switchTo('projectDetail');
-        
-    } catch (e) {
-        alert('加载项目失败: ' + e.message);
-    }
-}
-
-// 文字下达任务
-async function parseTextToTasks() {
-    const text = document.getElementById('taskTextInput').value.trim();
-    if (!text) {
-        alert('请输入任务内容');
-        return;
-    }
-    if (!currentProjectId) {
-        alert('请先选择项目');
-        return;
-    }
-    
-    try {
-        const resp = await fetch(API_BASE + '/api/projects/' + currentProjectId + '/tasks/parse-text', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
-        });
-        const data = await resp.json();
-        
-        if (data.success) {
-            alert('成功创建 ' + data.count + ' 个任务！');
-            document.getElementById('taskTextInput').value = '';
-            loadProjectTasks();
-            loadProjects(); // 刷新项目列表更新统计
-        } else {
-            alert('创建失败: ' + JSON.stringify(data));
-        }
-    } catch (e) {
-        alert('创建失败: ' + e.message);
-    }
-}
-
-// 清空任务输入
-function clearTaskInput() {
-    document.getElementById('taskTextInput').value = '';
-}
-
-// 文件选择处理
-function handleFileSelect(event) {
-    const file = event.target.files[0];
-    if (file) {
-        selectedFile = file;
-        document.getElementById('selectedFileName').style.display = 'block';
-        document.getElementById('fileNameDisplay').textContent = file.name;
-    }
-}
-
-// 上传文档
-async function uploadDocument() {
-    if (!selectedFile) {
-        alert('请先选择文件');
-        return;
-    }
-    if (!currentProjectId) {
-        alert('请先选择项目');
-        return;
-    }
-    
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('document_type', document.getElementById('documentType').value);
-    formData.append('description', document.getElementById('documentDesc').value);
-    
-    try {
-        const resp = await fetch(API_BASE + '/api/projects/' + currentProjectId + '/documents', {
-            method: 'POST',
-            body: formData
-        });
-        const data = await resp.json();
-        
-        if (data.success) {
-            alert('文档上传成功！');
-            selectedFile = null;
-            document.getElementById('selectedFileName').style.display = 'none';
-            document.getElementById('documentFile').value = '';
-            document.getElementById('documentDesc').value = '';
-            loadProjectDocs();
-            loadProjects();
-        } else {
-            alert('上传失败: ' + JSON.stringify(data));
-        }
-    } catch (e) {
-        alert('上传失败: ' + e.message);
-    }
-}
-
-// 加载项目任务
-async function loadProjectTasks() {
-    if (!currentProjectId) return;
-    
-    const status = document.getElementById('taskFilter').value;
-    const list = document.getElementById('projectTasksList');
-    list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">加载中...</div>';
-    
-    try {
-        const url = API_BASE + '/api/projects/' + currentProjectId + '/tasks' + (status ? '?status=' + status : '');
-        const resp = await fetch(url);
-        const data = await resp.json();
-        const tasks = data.tasks || [];
-        
-        if (tasks.length === 0) {
-            list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">暂无任务</div>';
-            return;
-        }
-        
-        const priorityColors = { 1: '#a0aec0', 5: '#667eea', 10: '#fbbf24', 20: '#f97316', 30: '#ef4444' };
-        const statusLabels = { pending: '待处理', assigned: '已分配', in_progress: '进行中', completed: '已完成', failed: '失败' };
-        
-        list.innerHTML = tasks.map(t => 
-            '<div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:12px;margin-bottom:8px;border-left:3px solid ' + (priorityColors[t.priority] || '#667eea') + ';">' +
-            '<div style="display:flex;justify-content:space-between;align-items:start;">' +
-            '<div style="flex:1;"><div style="font-weight:bold;font-size:14px;">' + t.title + '</div>' +
-            '<div style="font-size:12px;color:#666;margin-top:4px;">来源: ' + (t.source === 'document' ? '📄 文档' : '📝 文字') + '</div></div>' +
-            '<select onchange="updateTaskStatus(\'' + t.id + '\', this.value)" style="background:rgba(0,0,0,0.3);border:1px solid rgba(102,126,234,0.3);border-radius:4px;padding:4px 8px;color:#fff;font-size:12px;">' +
-            Object.keys(statusLabels).map(s => '<option value="' + s + '"' + (t.status === s ? ' selected' : '') + '>' + statusLabels[s] + '</option>').join('') +
-            '</select></div></div>'
-        ).join('');
-        
-    } catch (e) {
-        list.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">加载失败</div>';
-    }
-}
-
-// 更新任务状态
-async function updateTaskStatus(taskId, status) {
-    try {
-        const resp = await fetch(API_BASE + '/api/tasks/' + taskId, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status })
-        });
-        const data = await resp.json();
-        if (data.success) {
-            loadProjectTasks();
-        }
-    } catch (e) {
-        alert('更新失败: ' + e.message);
-    }
-}
-
-// 加载项目文档
-async function loadProjectDocs() {
-    if (!currentProjectId) return;
-    
-    const list = document.getElementById('projectDocsList');
-    list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">加载中...</div>';
-    
-    try {
-        const resp = await fetch(API_BASE + '/api/projects/' + currentProjectId + '/documents');
-        const data = await resp.json();
-        const docs = data.documents || [];
-        
-        if (docs.length === 0) {
-            list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">暂无文档</div>';
-            return;
-        }
-        
-        const typeIcons = { requirement: '📋', design: '🎨', technical: '⚙️', manual: '📖', reference: '📚', other: '📄' };
-        
-        list.innerHTML = docs.map(d => 
-            '<div style="background:rgba(0,0,0,0.2);border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">' +
-            '<div><span style="margin-right:8px;">' + (typeIcons[d.document_type] || '📄') + '</span>' +
-            '<span style="font-size:14px;">' + d.original_name + '</span>' +
-            '<span style="font-size:12px;color:#666;margin-left:10px;">' + Math.round(d.file_size / 1024) + ' KB</span></div>' +
-            '<div style="display:flex;gap:8px;">' +
-            (d.parsed ? '<span style="font-size:12px;color:#4ade80;">✅ 已解析</span>' : 
-            '<button onclick="parseDocument(\'' + d.id + '\')" style="background:rgba(102,126,234,0.3);border:none;color:#667eea;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;">解析</button>') +
-            '<a href="' + API_BASE + '/api/documents/' + d.id + '/download" style="color:#667eea;text-decoration:none;font-size:12px;">下载</a></div></div>'
-        ).join('');
-        
-    } catch (e) {
-        list.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">加载失败</div>';
-    }
-}
-
-// 解析文档
-async function parseDocument(docId) {
-    try {
-        const resp = await fetch(API_BASE + '/api/documents/' + docId + '/parse', { method: 'POST' });
-        const data = await resp.json();
-        
-        if (data.success) {
-            alert('解析成功，创建了 ' + data.count + ' 个任务！');
-            loadProjectDocs();
-            loadProjectTasks();
-        } else {
-            alert('解析失败: ' + JSON.stringify(data));
-        }
-    } catch (e) {
-        alert('解析失败: ' + e.message);
-    }
-}
-
-</script>
+        loadProjects(); loadMemories();
+    </script>
 </body>
 </html>

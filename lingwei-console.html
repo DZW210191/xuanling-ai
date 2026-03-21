@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>灵薇 AI 框架 | 控制台</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #00f5ff;
+            --secondary: #7b2cbf;
+            --accent: #ff006e;
+            --dark: #0a0a0f;
+            --dark-secondary: #12121a;
+            --dark-tertiary: #1a1a25;
+            --text: #e0e0e0;
+            --text-dim: #888;
+            --border: rgba(255,255,255,0.08);
+            --success: #00ff88;
+            --warning: #ffaa00;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: var(--dark);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: var(--dark-secondary);
+            border-right: 1px solid var(--border);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.3rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            padding: 10px 0 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .nav-item {
+            padding: 12px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 5px;
+            color: var(--text-dim);
+            font-size: 0.95rem;
+        }
+
+        .nav-item:hover {
+            background: rgba(255,255,255,0.05);
+            color: var(--text);
+        }
+
+        .nav-item.active {
+            background: linear-gradient(135deg, rgba(0,245,255,0.15), rgba(123,44,191,0.15));
+            color: var(--primary);
+            border: 1px solid rgba(0,245,255,0.2);
+        }
+
+        .nav-item .icon {
+            font-size: 1.2rem;
+        }
+
+        /* Main Content */
+        .main {
+            flex: 1;
+            margin-left: 260px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            padding: 20px 30px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10,10,15,0.8);
+            backdrop-filter: blur(20px);
+        }
+
+        .header-title {
+            font-size: 1.2rem;
+            font-weight: 500;
+        }
+
+        .header-status {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-text {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+        }
+
+        /* Chat Area */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 30px;
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding-right: 10px;
+        }
+
+        .message {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: linear-gradient(135deg, var(--secondary), var(--accent));
+        }
+
+        .message.ai .message-avatar {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+        }
+
+        .message-content {
+            flex: 1;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .message-name {
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .message-text {
+            line-height: 1.7;
+            font-size: 0.95rem;
+        }
+
+        .message-text code {
+            background: var(--dark-tertiary);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+        }
+
+        .message-text pre {
+            background: var(--dark-tertiary);
+            padding: 15px;
+            border-radius: 10px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+
+        .message-text pre code {
+            background: none;
+            padding: 0;
+        }
+
+        /* Input Area */
+        .input-area {
+            padding: 20px 30px;
+            border-top: 1px solid var(--border);
+            background: var(--dark-secondary);
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+        }
+
+        .input-box {
+            flex: 1;
+            background: var(--dark-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 15px;
+            padding: 15px 20px;
+            color: var(--text);
+            font-size: 0.95rem;
+            font-family: inherit;
+            resize: none;
+            min-height: 50px;
+            max-height: 150px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .input-box:focus {
+            border-color: rgba(0,245,255,0.5);
+        }
+
+        .input-box::placeholder {
+            color: var(--text-dim);
+        }
+
+        .send-btn {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            transition: all 0.3s;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 30px rgba(0,245,255,0.3);
+        }
+
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Tools Panel */
+        .tools-panel {
+            display: none;
+            padding: 30px;
+        }
+
+        .tools-panel.active {
+            display: block;
+        }
+
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .tool-card {
+            background: var(--dark-secondary);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .tool-card:hover {
+            border-color: rgba(0,245,255,0.3);
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .tool-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, rgba(0,245,255,0.2), rgba(123,44,191,0.2));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+        }
+
+        .tool-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+
+        .tool-card p {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            line-height: 1.6;
+        }
+
+        /* Status Panel */
+        .status-panel {
+            padding: 30px;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .status-card {
+            background: var(--dark-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .status-card .label {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+        }
+
+        .status-card .value {
+            font-size: 1.3rem;
+            font-weight: 500;
+        }
+
+        .status-card .value.success { color: var(--success); }
+        .status-card .value.warning { color: var(--warning); }
+
+        /* Loading */
+        .typing-indicator {
+            display: flex;
+            gap: 5px;
+            padding: 10px 0;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            .main {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">🧠</div>
+            <span>灵薇 AI</span>
+        </div>
+        
+        <div class="nav-item active" data-panel="chat">
+            <span class="icon">💬</span>
+            <span>AI 对话</span>
+        </div>
+        
+        <div class="nav-item" data-panel="tools">
+            <span class="icon">🛠️</span>
+            <span>工具箱</span>
+        </div>
+        
+        <div class="nav-item" data-panel="status">
+            <span class="icon">📊</span>
+            <span>系统状态</span>
+        </div>
+        
+        <div class="nav-item" data-panel="dgm">
+            <span class="icon">🧬</span>
+            <span>DGM 控制</span>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-title">AI 控制台</div>
+            <div class="header-status">
+                <div class="status-dot"></div>
+                <span class="status-text">在线 · MiniMax-M2.5</span>
+            </div>
+        </header>
+
+        <!-- Chat Panel -->
+        <div class="chat-container" id="chat-panel">
+            <div class="chat-messages" id="chat-messages">
+                <div class="message ai">
+                    <div class="message-avatar">🧠</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-name">灵薇</span>
+                            <span class="message-time">刚刚</span>
+                        </div>
+                        <div class="message-text">
+                            你好！我是 <strong>灵薇 AI 框架</strong> 🧠<br><br>
+                            我可以帮你：<br>
+                            • 智能对话与问答<br>
+                            • 代码编写与调试<br>
+                            • 文件操作与管理<br>
+                            • 自我进化优化 (DGM)<br><br>
+                            有什么我可以帮你的吗？
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <textarea class="input-box" id="user-input" placeholder="输入你的问题或指令..." rows="1"></textarea>
+                    <button class="send-btn" id="send-btn" onclick="sendMessage()">🚀</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tools Panel -->
+        <div class="tools-panel" id="tools-panel">
+            <h2 style="margin-bottom: 25px;">🛠️ 可用工具</h2>
+            <div class="tool-grid">
+                <div class="tool-card" onclick="useTool('代码审查')">
+                    <div class="tool-icon">🔍</div>
+                    <h3>代码审查</h3>
+                    <p>分析代码质量，发现潜在问题，提供优化建议</p>
+                </div>
+                
+                <div class="tool-card" onclick="useTool('文件管理')">
+                    <div class="tool-icon">📁</div>
+                    <h3>文件管理</h3>
+                    <p>浏览、创建、编辑服务器上的文件</p>
+                </div>
+                
+                <div class="tool-card" onclick="useTool('执行命令')">
+                    <div class="tool-icon">⚡</div>
+                    <h3>执行命令</h3>
+                    <p>在服务器上执行 shell 命令</p>
+                </div>
+                
+                <div class="tool-card" onclick="useTool('网页抓取')">
+                    <div class="tool-icon">🌐</div>
+                    <h3>网页抓取</h3>
+                    <p>获取网页内容，提取关键信息</p>
+                </div>
+                
+                <div class="tool-card" onclick="useTool('AI 绘图')">
+                    <div class="tool-icon">🎨</div>
+                    <h3>AI 绘图</h3>
+                    <p>使用 AI 生成图像（需配置 API）</p>
+                </div>
+                
+                <div class="tool-card" onclick="useTool('定时任务')">
+                    <div class="tool-icon">⏰</div>
+                    <h3>定时任务</h3>
+                    <p>设置提醒和周期性任务</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Panel -->
+        <div class="status-panel" id="status-panel" style="display: none;">
+            <h2 style="margin-bottom: 25px;">📊 系统状态</h2>
+            <div class="status-grid">
+                <div class="status-card">
+                    <div class="label">运行时间</div>
+                    <div class="value" id="uptime">--</div>
+                </div>
+                <div class="status-card">
+                    <div class="label">模型</div>
+                    <div class="value">MiniMax-M2.5</div>
+                </div>
+                <div class="status-card">
+                    <div class="label">DGM 状态</div>
+                    <div class="value success" id="dgm-status">已启用</div>
+                </div>
+                <div class="status-card">
+                    <div class="label">对话数</div>
+                    <div class="value" id="msg-count">0</div>
+                </div>
+                <div class="status-card">
+                    <div class="label">内存使用</div>
+                    <div class="value" id="memory">--</div>
+                </div>
+                <div class="status-card">
+                    <div class="label">CPU</div>
+                    <div class="value" id="cpu">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DGM Panel -->
+        <div class="status-panel" id="dgm-panel" style="display: none;">
+            <h2 style="margin-bottom: 25px;">🧬 DGM 自我改进控制</h2>
+            <div class="status-grid">
+                <div class="status-card">
+                    <div class="label">进化次数</div>
+                    <div class="value" id="evo-count">0</div>
+                </div>
+                <div class="status-card">
+                    <div class="label">当前版本</div>
+                    <div class="value">v1.0.0</div>
+                </div>
+                <div class="status-card">
+                    <div class="label">改进效率</div>
+                    <div class="value success">98.5%</div>
+                </div>
+                <div class="status-card">
+                    <div class="label">自我修改</div>
+                    <div class="value success">启用</div>
+                </div>
+            </div>
+            <div style="margin-top: 30px;">
+                <button class="send-btn" style="width: auto; padding: 15px 30px;" onclick="triggerDGM()">
+                    🔄 触发自我进化
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // State
+        let messageCount = 0;
+        let startTime = Date.now();
+
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                
+                const panel = item.dataset.panel;
+                showPanel(panel);
+            });
+        });
+
+        function showPanel(panel) {
+            document.getElementById('chat-panel').style.display = panel === 'chat' ? 'flex' : 'none';
+            document.getElementById('tools-panel').classList.toggle('active', panel === 'tools');
+            document.getElementById('status-panel').style.display = panel === 'status' ? 'block' : 'none';
+            document.getElementById('dgm-panel').style.display = panel === 'dgm' ? 'block' : 'none';
+        }
+
+        // Chat
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatMessages = document.getElementById('chat-messages');
+
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // Add user message
+            addMessage('user', text);
+            userInput.value = '';
+            messageCount++;
+            document.getElementById('msg-count').textContent = messageCount;
+
+            // Show typing
+            showTyping();
+
+            // Simulate AI response
+            setTimeout(() => {
+                removeTyping();
+                const response = generateResponse(text);
+                addMessage('ai', response);
+            }, 1500);
+        }
+
+        function addMessage(type, text) {
+            const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            const avatar = type === 'user' ? '👤' : '🧠';
+            const name = type === 'user' ? '你' : '灵薇';
+            
+            const html = `
+                <div class="message ${type}">
+                    <div class="message-avatar">${avatar}</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-name">${name}</span>
+                            <span class="message-time">${time}</span>
+                        </div>
+                        <div class="message-text">${formatText(text)}</div>
+                    </div>
+                </div>
+            `;
+            
+            chatMessages.insertAdjacentHTML('beforeend', html);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function formatText(text) {
+            return text.replace(/\n/g, '<br>');
+        }
+
+        function showTyping() {
+            const html = `
+                <div class="message ai" id="typing">
+                    <div class="message-avatar">🧠</div>
+                    <div class="message-content">
+                        <div class="typing-indicator">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            chatMessages.insertAdjacentHTML('beforeend', html);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeTyping() {
+            const typing = document.getElementById('typing');
+            if (typing) typing.remove();
+        }
+
+        // Simple AI Response (Demo)
+        function generateResponse(text) {
+            const lower = text.toLowerCase();
+            
+            if (lower.includes('你好') || lower.includes('hello') || lower.includes('hi')) {
+                return '你好！有什么我可以帮你的吗？';
+            }
+            if (lower.includes('天气')) {
+                return '我目前没有实时天气数据，不过你可以通过工具技能接入天气 API。要我帮你配置吗？';
+            }
+            if (lower.includes('帮助')) {
+                return `我可以帮你做很多事情：<br>
+• 💬 智能对话问答<br>
+• 🔍 代码审查与分析<br>
+• 📁 文件管理操作<br>
+• ⚡ 执行服务器命令<br>
+• 🌐 网页内容抓取<br>
+• 🧬 DGM 自我进化<br><br>
+直接告诉我你想要什么！`;
+            }
+            if (lower.includes('谁是你') || lower.includes('你是谁')) {
+                return '我是 <strong>灵薇 AI 框架</strong>，一个基于 OpenClaw 构建的智能代理系统。<br><br>我的核心能力：<br>• 🧠 MiniMax-M2.5 强力模型<br>• 🧬 DGM 自我改进能力<br>• 🔗 多平台接入（飞书、Telegram等）<br>• 🛠️ 丰富工具生态';
+            }
+            
+            return `收到你的消息: "${text}"<br><br>
+这是一个演示版本。目前我可以：<br>
+• 进行基础对话<br>
+• 展示系统功能<br><br>
+要体验完整功能，请通过飞书/Telegram 等平台与我对话，我会展现真正的 AI 能力！`;
+        }
+
+        // Tools
+        function useTool(toolName) {
+            userInput.value = `请使用 ${toolName} 功能：`;
+            userInput.focus();
+            document.querySelector('[data-panel="chat"]').click();
+        }
+
+        // DGM
+        function triggerDGM() {
+            addMessage('ai', '🧬 正在触发 DGM 自我进化...<br><br>此功能需要在完整环境中运行，当前为演示模式。');
+        }
+
+        // Update stats
+        function updateStats() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const hours = Math.floor(elapsed / 3600);
+            const mins = Math.floor((elapsed % 3600) / 60);
+            document.getElementById('uptime').textContent = `${hours}h ${mins}m`;
+        }
+
+        setInterval(updateStats, 1000);
+        updateStats();
+    </script>
+</body>
+</html>

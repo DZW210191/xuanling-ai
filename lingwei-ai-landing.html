@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>灵薇 AI 框架 | 下一代智能代理</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #00f5ff;
+            --secondary: #7b2cbf;
+            --accent: #ff006e;
+            --dark: #0a0a0f;
+            --dark-secondary: #12121a;
+            --text: #e0e0e0;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: var(--dark);
+            color: var(--text);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* Animated Background */
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(90deg, rgba(0,245,255,0.03) 1px, transparent 1px),
+                linear-gradient(rgba(0,245,255,0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -2;
+        }
+
+        .bg-glow {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: 
+                radial-gradient(ellipse at 20% 20%, rgba(123,44,191,0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 80%, rgba(0,245,255,0.1) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(255,0,110,0.05) 0%, transparent 70%);
+        }
+
+        /* Header */
+        header {
+            padding: 20px 50px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(10,10,15,0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0,245,255,0.1);
+            position: fixed;
+            width: 100%;
+            z-index: 100;
+        }
+
+        .logo {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 2px;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 30px;
+        }
+
+        .nav-links a {
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.9rem;
+            opacity: 0.7;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .nav-links a:hover {
+            opacity: 1;
+            color: var(--primary);
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--primary);
+            transition: width 0.3s;
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 100px 20px;
+            position: relative;
+        }
+
+        .hero-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            background: rgba(0,245,255,0.1);
+            border: 1px solid rgba(0,245,255,0.3);
+            border-radius: 30px;
+            font-size: 0.85rem;
+            color: var(--primary);
+            margin-bottom: 30px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(0,245,255,0.2); }
+            50% { box-shadow: 0 0 40px rgba(0,245,255,0.4); }
+        }
+
+        .hero h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(2.5rem, 8vw, 5rem);
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 20px;
+        }
+
+        .hero h1 .gradient {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 50%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 3s infinite;
+            background-size: 200% auto;
+        }
+
+        @keyframes shimmer {
+            to { background-position: 200% center; }
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            max-width: 600px;
+            opacity: 0.7;
+            margin-bottom: 40px;
+            line-height: 1.8;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: var(--dark);
+            border: none;
+            box-shadow: 0 10px 30px rgba(0,245,255,0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 20px 50px rgba(0,245,255,0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text);
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Floating Particles */
+        .particles {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: float 15s infinite;
+            opacity: 0.5;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.5; }
+            90% { opacity: 0.5; }
+            100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+        }
+
+        /* Features Section */
+        .features {
+            padding: 100px 50px;
+            background: var(--dark-secondary);
+        }
+
+        .section-title {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-title h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+
+        .section-title p {
+            opacity: 0.6;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 40px 30px;
+            transition: all 0.4s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            transform: scaleX(0);
+            transition: transform 0.4s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            border-color: rgba(0,245,255,0.2);
+            box-shadow: 0 20px 60px rgba(0,245,255,0.1);
+        }
+
+        .feature-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .feature-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, rgba(0,245,255,0.2), rgba(123,44,191,0.2));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+        }
+
+        .feature-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 12px;
+        }
+
+        .feature-card p {
+            opacity: 0.6;
+            font-size: 0.95rem;
+            line-height: 1.7;
+        }
+
+        /* Code Demo Section */
+        .code-section {
+            padding: 100px 50px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+            max-width: 800px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .code-header {
+            padding: 15px 20px;
+            background: rgba(255,255,255,0.02);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .code-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .code-dot.red { background: #ff5f56; }
+        .code-dot.yellow { background: #ffbd2e; }
+        .code-dot.green { background: #27ca40; }
+
+        .code-content {
+            padding: 30px;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.95rem;
+            line-height: 1.8;
+            overflow-x: auto;
+        }
+
+        .code-content .keyword { color: #ff79c6; }
+        .code-content .function { color: #50fa7b; }
+        .code-content .string { color: #f1fa8c; }
+        .code-content .comment { color: #6272a4; }
+        .code-content .variable { color: #8be9fd; }
+
+        /* Stats Section */
+        .stats {
+            padding: 80px 50px;
+            background: linear-gradient(180deg, var(--dark-secondary), var(--dark));
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 40px;
+            max-width: 900px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .stat-item h3 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 3rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-item p {
+            opacity: 0.6;
+            font-size: 1rem;
+            margin-top: 10px;
+        }
+
+        /* Footer */
+        footer {
+            padding: 40px 50px;
+            text-align: center;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            opacity: 0.6;
+            font-size: 0.9rem;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            header {
+                padding: 15px 20px;
+            }
+            
+            .nav-links {
+                display: none;
+            }
+
+            .hero {
+                padding: 80px 20px;
+            }
+
+            .features, .code-section, .stats {
+                padding: 60px 20px;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+    
+    <!-- Particles -->
+    <div class="particles">
+        <div class="particle" style="left: 10%; animation-delay: 0s;"></div>
+        <div class="particle" style="left: 20%; animation-delay: 2s; background: var(--secondary);"></div>
+        <div class="particle" style="left: 30%; animation-delay: 4s;"></div>
+        <div class="particle" style="left: 50%; animation-delay: 1s; background: var(--accent);"></div>
+        <div class="particle" style="left: 70%; animation-delay: 3s;"></div>
+        <div class="particle" style="left: 80%; animation-delay: 5s; background: var(--secondary);"></div>
+        <div class="particle" style="left: 90%; animation-delay: 2.5s;"></div>
+    </div>
+
+    <header>
+        <div class="logo">灵薇 AI</div>
+        <nav class="nav-links">
+            <a href="#features">特性</a>
+            <a href="#demo">示例</a>
+            <a href="#stats">数据</a>
+            <a href="#contact">联系</a>
+        </nav>
+    </header>
+
+    <section class="hero">
+        <div class="hero-badge">✨ 下一代 AI 智能框架</div>
+        <h1>
+            <span class="gradient">灵薇 AI 框架</span>
+        </h1>
+        <p>自我进化的 AI 代理系统 | 融合 DGM 核心技术 | 开箱即用的智能解决方案</p>
+        <div class="cta-buttons">
+            <a href="#" class="btn btn-primary">开始使用</a>
+            <a href="#demo" class="btn btn-secondary">查看演示</a>
+        </div>
+    </section>
+
+    <section class="features" id="features">
+        <div class="section-title">
+            <h2>核心特性</h2>
+            <p>强大的功能集，让 AI 开发更简单</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🧠</div>
+                <h3>自我改进 DGM</h3>
+                <p>内置达尔文·哥德尔机器核心，支持代码级别的自我进化，持续优化性能与能力。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔗</div>
+                <h3>多平台接入</h3>
+                <p>支持飞书、Telegram、Discord 等主流平台，无缝对接你的工作流。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>高性能运行</h3>
+                <p>基于 MiniMax-M2.5 强大模型，响应迅速，支持高并发处理。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>企业级安全</h3>
+                <p>完善的数据隔离与加密机制，保障你的隐私与业务安全。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🛠️</div>
+                <h3>灵活扩展</h3>
+                <p>模块化架构设计，支持自定义技能与插件，按需定制你的 AI 助手。</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>智能记忆</h3>
+                <p>长期记忆与上下文理解，会记住你的偏好，提供个性化服务。</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="code-section" id="demo">
+        <div class="code-block">
+            <div class="code-header">
+                <span class="code-dot red"></span>
+                <span class="code-dot yellow"></span>
+                <span class="code-dot green"></span>
+                <span style="margin-left: 15px; opacity: 0.5; font-size: 0.85rem;">lingwei_demo.py</span>
+            </div>
+            <div class="code-content">
+                <span class="comment"># 快速开始：创建你的第一个智能代理</span><br><br>
+                <span class="keyword">from</span> lingwei <span class="keyword">import</span> Agent<br><br>
+                <span class="comment"># 初始化灵薇代理</span><br>
+                <span class="variable">agent</span> = <span class="function">Agent</span>(<br>
+                &nbsp;&nbsp;model=<span class="string">"minimax/MiniMax-M2.5"</span>,<br>
+                &nbsp;&nbsp;platforms=<span class="string">["feishu", "telegram"]</span>,<br>
+                &nbsp;&nbsp;dgm_enabled=<span class="keyword">True</span><br>
+                )<br><br>
+                <span class="comment"># 启动自我进化模式</span><br>
+                <span class="variable">agent</span>.<span class="function">enable_dgm</span>(<br>
+                &nbsp;&nbsp;improvement_interval=<span class="string">3600</span>,<br>
+                &nbsp;&nbsp;self_modify=<span class="keyword">True</span><br>
+                )<br><br>
+                <span class="comment"># 让它开始工作</span><br>
+                <span class="variable">agent</span>.<span class="function">run</span>()
+            </div>
+        </div>
+    </section>
+
+    <section class="stats" id="stats">
+        <div class="stats-grid">
+            <div class="stat-item">
+                <h3>99.9%</h3>
+                <p>可用性</p>
+            </div>
+            <div class="stat-item">
+                <h3>&lt;2s</h3>
+                <p>平均响应</p>
+            </div>
+            <div class="stat-item">
+                <h3>10+</h3>
+                <p>已接入平台</p>
+            </div>
+            <div class="stat-item">
+                <h3>24/7</h3>
+                <p>智能运行</p>
+            </div>
+        </div>
+    </section>
+
+    <footer id="contact">
+        <p>🚀 灵薇 AI 框架 — 下一代智能代理系统</p>
+        <p style="margin-top: 10px; opacity: 0.5;">Built with ❤️ with DGM Self-Improvement</p>
+    </footer>
+
+    <script>
+        // Smooth scroll
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+
+        // Intersection Observer for animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        });
+
+        document.querySelectorAll('.feature-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(30px)';
+            card.style.transition = 'all 0.6s ease-out';
+            observer.observe(card);
+        });
+    </script>
+</body>
+</html>

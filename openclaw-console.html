@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw 控制台</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-hover: #30363d;
+            --border: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent: #58a6ff;
+            --accent-hover: #79c0ff;
+            --green: #3fb950;
+            --purple: #a371f7;
+            --orange: #d29922;
+            --red: #f85149;
+            --cyan: #39d353;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .sidebar {
+            width: 260px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+
+        .nav-section {
+            padding: 15px;
+        }
+
+        .nav-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            padding: 0 10px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.15s;
+            font-size: 0.9rem;
+            border: 1px solid transparent;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: rgba(88, 166, 255, 0.1);
+            color: var(--accent);
+            border-color: rgba(88, 166, 255, 0.2);
+        }
+
+        .nav-item .icon {
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .nav-item .badge {
+            margin-left: auto;
+            background: var(--bg-hover);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+        }
+
+        .main {
+            flex: 1;
+            margin-left: 260px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            height: 64px;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--bg-secondary);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .breadcrumb {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+
+        .breadcrumb span {
+            color: var(--text-secondary);
+        }
+
+        .breadcrumb .current {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .header-btn {
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.15s;
+        }
+
+        .header-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        .header-btn.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .header-btn.primary:hover {
+            background: var(--accent-hover);
+        }
+
+        .content {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 15px;
+            width: 300px;
+        }
+
+        .search-box input {
+            background: none;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .search-box input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1px;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            border-bottom: 2px solid transparent;
+            transition: all 0.15s;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        .skill-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .skill-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .skill-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .skill-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+        }
+
+        .skill-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .skill-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
+
+        .skill-author {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .skill-desc {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        .skill-meta {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .skill-tags {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .skill-tag {
+            padding: 4px 10px;
+            background: var(--bg-tertiary);
+            border-radius: 20px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .skill-tag.ai { color: var(--purple); }
+        .skill-tag.dev { color: var(--accent); }
+        .skill-tag.ops { color: var(--orange); }
+
+        .skill-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+        }
+
+        .skill-btn {
+            flex: 1;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+
+        .skill-btn.install {
+            background: var(--accent);
+            border: none;
+            color: #fff;
+        }
+
+        .skill-btn.install:hover {
+            background: var(--accent-hover);
+        }
+
+        .skill-btn.installed {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--green);
+        }
+
+        .chat-panel {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 64px);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .message-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: linear-gradient(135deg, var(--purple), var(--red));
+        }
+
+        .message.ai .message-avatar {
+            background: linear-gradient(135deg, var(--accent), var(--cyan));
+        }
+
+        .message-content {
+            flex: 1;
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .message-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .message-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .message-text {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .message-text strong {
+            color: var(--text-primary);
+        }
+
+        .chat-input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-secondary);
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 18px;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: inherit;
+            resize: none;
+            min-height: 50px;
+            max-height: 150px;
+            outline: none;
+        }
+
+        .chat-input:focus {
+            border-color: var(--accent);
+        }
+
+        .chat-send-btn {
+            width: 50px;
+            height: 50px;
+            background: var(--accent);
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            transition: all 0.15s;
+        }
+
+        .chat-send-btn:hover {
+            background: var(--accent-hover);
+            transform: scale(1.05);
+        }
+
+        .terminal {
+            background: #0a0a0a;
+            border-radius: 12px;
+            overflow: hidden;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .terminal-header {
+            padding: 12px 16px;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .terminal-dot.red { background: #ff5f57; }
+        .terminal-dot.yellow { background: #febc2e; }
+        .terminal-dot.green { background: #28c840; }
+
+        .terminal-title {
+            margin-left: 10px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .terminal-body {
+            padding: 20px;
+            min-height: 400px;
+            font-size: 0.85rem;
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+
+        .terminal-line {
+            margin-bottom: 8px;
+        }
+
+        .terminal-prompt {
+            color: var(--green);
+        }
+
+        .terminal-command {
+            color: var(--text-primary);
+        }
+
+        .terminal-output {
+            color: var(--text-secondary);
+        }
+
+        .terminal-input {
+            background: none;
+            border: none;
+            outline: none;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: inherit;
+            width: calc(100% - 100px);
+        }
+
+        .panel {
+            display: none;
+        }
+
+        .panel.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { display: none; }
+            .main { margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">🦷</div>
+                <span>OpenClaw</span>
+            </div>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-label">主菜单</div>
+            <div class="nav-item active" data-panel="chat">
+                <span class="icon">💬</span>
+                <span>对话</span>
+            </div>
+            <div class="nav-item" data-panel="skills">
+                <span class="icon">🛠️</span>
+                <span>技能商店</span>
+                <span class="badge">339+</span>
+            </div>
+            <div class="nav-item" data-panel="installed">
+                <span class="icon">📦</span>
+                <span>已安装</span>
+                <span class="badge">2</span>
+            </div>
+            <div class="nav-item" data-panel="terminal">
+                <span class="icon">⌨️</span>
+                <span>终端</span>
+            </div>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-label">系统</div>
+            <div class="nav-item" data-panel="plugins">
+                <span class="icon">🔌</span>
+                <span>插件</span>
+            </div>
+            <div class="nav-item" data-panel="dgm">
+                <span class="icon">🧬</span>
+                <span>DGM 控制</span>
+            </div>
+            <div class="nav-item" data-panel="settings">
+                <span class="icon">⚙️</span>
+                <span>设置</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+        <header class="header">
+            <div class="header-left">
+                <div class="breadcrumb">
+                    <span>OpenClaw</span>
+                    <span>/</span>
+                    <span class="current" id="page-title">对话</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="status-indicator">
+                    <div class="status-dot"></div>
+                    <span>在线</span>
+                </div>
+                <button class="header-btn">文档</button>
+                <button class="header-btn primary">+ 新建</button>
+            </div>
+        </header>
+
+        <!-- Chat Panel -->
+        <div class="panel active" id="panel-chat">
+            <div class="chat-panel">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message ai">
+                        <div class="message-avatar">🦷</div>
+                        <div class="message-content">
+                            <div class="message-header">
+                                <span class="message-name">OpenClaw</span>
+                                <span class="message-time">系统</span>
+                            </div>
+                            <div class="message-text">
+                                你好！我是 <strong>OpenClaw</strong> AI 助手 🦷<br><br>
+                                我可以帮你完成各种任务：<br>
+                                • 💬 智能对话与问答<br>
+                                • 🛠️ 安装和管理 Skills<br>
+                                • ⚡ 执行命令和操作<br>
+                                • 🧬 DGM 自我进化<br><br>
+                                请在下方输入你的需求，或者从侧边栏选择功能。
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-input-area">
+                    <div class="chat-input-wrapper">
+                        <textarea class="chat-input" id="chat-input" placeholder="输入你的指令..."></textarea>
+                        <button class="chat-send-btn" onclick="sendChat()">➤</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Skills Panel -->
+        <div class="panel" id="panel-skills">
+            <div class="content">
+                <div class="section-header">
+                    <h2 class="section-title">🛠️ 技能商店</h2>
+                    <div class="search-box">
+                        <span>🔍</span>
+                        <input type="text" placeholder="搜索 Skills..." id="skill-search">
+                    </div>
+                </div>
+
+                <div class="tabs">
+                    <div class="tab active" data-filter="all">全部</div>
+                    <div class="tab" data-filter="ai">AI 工具</div>
+                    <div class="tab" data-filter="dev">开发</div>
+                    <div class="tab" data-filter="ops">运维</div>
+                    <div class="tab" data-filter="productivity">效率</div>
+                </div>
+
+                <div class="skills-grid" id="skills-grid"></div>
+            </div>
+        </div>
+
+        <!-- Installed Panel -->
+        <div class="panel" id="panel-installed">
+            <div class="content">
+                <div class="section-header">
+                    <h2 class="section-title">📦 已安装 Skills</h2>
+                </div>
+                <div class="skills-grid" id="installed-grid"></div>
+            </div>
+        </div>
+
+        <!-- Terminal Panel -->
+        <div class="panel" id="panel-terminal">
+            <div class="content">
+                <div class="section-header">
+                    <h2 class="section-title">⌨️ 终端</h2>
+                </div>
+                <div class="terminal">
+                    <div class="terminal-header">
+                        <span class="terminal-dot red"></span>
+                        <span class="terminal-dot yellow"></span>
+                        <span class="terminal-dot green"></span>
+                        <span class="terminal-title">OpenClaw Terminal</span>
+                    </div>
+                    <div class="terminal-body" id="terminal-body">
+                        <div class="terminal-line">
+                            <span class="terminal-prompt">➜ ~</span> <span class="terminal-command">openclaw status</span>
+                        </div>
+                        <div class="terminal-line terminal-output">
+=== OpenClaw Status ===<br>
+Version: 2026.3.8<br>
+Model: MiniMax-M2.5<br>
+Runtime: node v22.22.1<br>
+Skills: 2 installed<br>
+Status: 🟢 Online
+                        </div>
+                        <br>
+                        <div class="terminal-line">
+                            <span class="terminal-prompt">➜ ~</span> <input type="text" class="terminal-input" id="terminal-input" placeholder="输入命令...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plugins Panel -->
+        <div class="panel" id="panel-plugins">
+            <div class="content">
+                <div class="section-header">
+                    <h2 class="section-title">🔌 插件管理</h2>
+                </div>
+                <div class="skills-grid" id="plugins-grid"></div>
+            </div>
+        </div>
+
+        <!-- DGM Panel -->
+        <div class="panel" id="panel-dgm">
+            <div class="content">
+                <div class="section-header">
+                    <h2 class="section-title">🧬 DGM 自我改进</h2>
+                </div>
+                <div class="skills-grid">
+                    <div class="skill-card">
+                        <div class="skill-header">
+                            <div class="skill-icon">🧬</div>
+                            <div class="skill-info">
+                                <div class="skill-name">DGM (Darwin Gödel Machine)</div>
+                                <div class="skill-author">OpenClaw</div>
+                            </div>
+                        </div>
+                        <div class="skill-desc">让 AI Agent 能够自我改进代码，在基准测试上验证效果</div>
+                        <div class="skill-meta">
+                            <span>📊 v1.0.0</span>
+                            <span>✅ 已安装</span>
+                        </div>
+                        <div class="skill-tags">
+                            <span class="skill-tag ai">AI</span>
+                        </div>
+                        <div class="skill-actions">
+                            <div class="skill-btn installed">✓ 已启用</div>
+                            <div class="skill-btn install" style="background: var(--purple);">配置</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div class="panel" id="panel-settings">
+            <div class="content">
+                <div class="section-header">
+                    <h2 class="section-title">⚙️ 系统设置</h2>
+                </div>
+                <div class="terminal">
+                    <div class="terminal-body">
+                        <div class="terminal-line">
+                            <span class="terminal-prompt"># OpenClaw 配置</span>
+                        </div>
+                        <div class="terminal-line terminal-output">
+model: minimax/MiniMax-M2.5<br>
+api_base: https://code.coolyeah.net/v1<br>
+skills_dir: ~/.openclaw/skills<br>
+plugins: feishu, telegram, discord<br>
+dgm_enabled: true<br>
+self_improve: true
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Skills Data (真实 OpenClaw Skills)
+        const skillsData = [
+            {
+                name: 'feishu-doc',
+                author: 'OpenClaw',
+                icon: '📄',
+                desc: '飞书文档 API 写入规范，将 Markdown 转换为飞书 Block 结构',
+                version: '1.0.0',
+                tags: ['ai'],
+                installed: true
+            },
+            {
+                name: 'tencent-cloud-cos',
+                author: 'OpenClaw',
+                icon: '☁️',
+                desc: '腾讯云对象存储 COS 和数据万象 CI 集成，支持图片处理',
+                version: '1.0.0',
+                tags: ['dev', 'ops'],
+                installed: false
+            },
+            {
+                name: 'github',
+                author: 'OpenClaw',
+                icon: '🐙',
+                desc: '使用 gh CLI 与 GitHub 交互，PR、Issue、Actions 管理',
+                version: '1.0.0',
+                tags: ['dev'],
+                installed: false
+            },
+            {
+                name: 'Agent Browser',
+                author: 'OpenClaw',
+                icon: '🌐',
+                desc: 'Rust 编写的无头浏览器自动化 CLI，支持 AI 代理网页操作',
+                version: '1.0.0',
+                tags: ['ai', 'dev'],
+                installed: false
+            },
+            {
+                name: 'DGM Skill',
+                author: 'OpenClaw',
+                icon: '🧬',
+                desc: 'Darwin Gödel Machine 自我改进框架，让 AI 能自我优化代码',
+                version: '1.0.0',
+                tags: ['ai'],
+                installed: true
+            },
+            {
+                name: 'tencent-docs',
+                author: 'OpenClaw',
+                icon: '📝',
+                desc: '腾讯文档操作，创建文档、编辑、智能表格、知识库管理',
+                version: '1.0.0',
+                tags: ['productivity'],
+                installed: false
+            },
+            {
+                name: 'weather',
+                author: 'OpenClaw',
+                icon: '🌤️',
+                desc: '获取天气预报，无需 API Key',
+                version: '1.0.0',
+                tags: ['productivity'],
+                installed: false
+            },
+            {
+                name: 'skill-creator',
+                author: 'OpenClaw',
+                icon: '✨',
+                desc: '创建、编辑、改进、审计 AgentSkills 技能开发工具',
+                version: '1.0.0',
+                tags: ['dev'],
+                installed: false
+            },
+            {
+                name: 'obsidian',
+                author: 'OpenClaw',
+                icon: '📚',
+                desc: '与 Obsidian vaults (Markdown 笔记) 交互和自动化',
+                version: '1.0.0',
+                tags: ['productivity'],
+                installed: false
+            },
+            {
+                name: 'chinese-llm-router',
+                author: 'OpenClaw',
+                icon: '🔀',
+                desc: '将对话路由至顶级中文大模型，智能选模、自动容灾',
+                version: '1.0.0',
+                tags: ['ai'],
+                installed: false
+            },
+            {
+                name: 'wecom-doc',
+                author: 'OpenClaw',
+                icon: '📊',
+                desc: '企业微信文档与智能表格操作',
+                version: '1.0.0',
+                tags: ['productivity'],
+                installed: false
+            },
+            {
+                name: 'lightclawbot-cron',
+                author: 'LightClawBot',
+                icon: '⏰',
+                desc: '定时任务提醒，支持一次性提醒、周期性任务',
+                version: '1.0.0',
+                tags: ['productivity'],
+                installed: false
+            }
+        ];
+
+        const pluginsData = [
+            {
+                name: '飞书',
+                author: 'OpenClaw',
+                icon: '📱',
+                desc: '飞书消息接入，支持对话、卡片、机器人等',
+                enabled: true
+            },
+            {
+                name: 'Telegram',
+                author: 'OpenClaw',
+                icon: '🖥️',
+                desc: 'Telegram Bot 接入，支持消息、命令、inline buttons',
+                enabled: false
+            },
+            {
+                name: 'Discord',
+                author: 'OpenClaw',
+                icon: '💬',
+                desc: 'Discord 机器人，支持服务器管理、消息、slash commands',
+                enabled: false
+            },
+            {
+                name: 'WhatsApp',
+                author: 'OpenClaw',
+                icon: '📲',
+                desc: 'WhatsApp 消息接入，支持群聊、私聊、文件传输',
+                enabled: false
+            },
+            {
+                name: 'Signal',
+                author: 'OpenClaw',
+                icon: '🔔',
+                desc: 'Signal 消息接入，端到端加密通讯',
+                enabled: false
+            },
+            {
+                name: 'Slack',
+                author: 'OpenClaw',
+                icon: '💼',
+                desc: 'Slack 工作区集成，支持频道、线程、App',
+                enabled: false
+            }
+        ];
+
+        // Render Skills
+        function renderSkills(filter = 'all') {
+            const grid = document.getElementById('skills-grid');
+            const filtered = filter === 'all' 
+                ? skillsData 
+                : skillsData.filter(s => s.tags.includes(filter));
+            
+            grid.innerHTML = filtered.map(skill => `
+                <div class="skill-card" onclick="installSkill('${skill.name}')">
+                    <div class="skill-header">
+                        <div class="skill-icon">${skill.icon}</div>
+                        <div class="skill-info">
+                            <div class="skill-name">${skill.name}</div>
+                            <div class="skill-author">${skill.author}</div>
+                        </div>
+                    </div>
+                    <div class="skill-desc">${skill.desc}</div>
+                    <div class="skill-meta">
+                        <span>📊 v${skill.version}</span>
+                    </div>
+                    <div class="skill-tags">
+                        ${skill.tags.map(t => `<span class="skill-tag ${t}">${t}</span>`).join('')}
+                    </div>
+                    <div class="skill-actions">
+                        <div class="skill-btn ${skill.installed ? 'installed' : 'install'}">
+                            ${skill.installed ? '✓ 已安装' : '安装'}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render Installed
+        function renderInstalled() {
+            const grid = document.getElementById('installed-grid');
+            const installed = skillsData.filter(s => s.installed);
+            
+            grid.innerHTML = installed.length ? installed.map(skill => `
+                <div class="skill-card">
+                    <div class="skill-header">
+                        <div class="skill-icon">${skill.icon}</div>
+                        <div class="skill-info">
+                            <div class="skill-name">${skill.name}</div>
+                            <div class="skill-author">${skill.author}</div>
+                        </div>
+                    </div>
+                    <div class="skill-desc">${skill.desc}</div>
+                    <div class="skill-meta">
+                        <span>📊 v${skill.version}</span>
+                        <span style="color: var(--green);">✓ 已安装</span>
+                    </div>
+                    <div class="skill-actions">
+                        <div class="skill-btn installed">已安装</div>
+                        <div class="skill-btn install" style="background: var(--red);">卸载</div>
+                    </div>
+                </div>
+            `).join('') : '<p style="color: var(--text-muted);">暂无已安装的 Skills</p>';
+        }
+
+        // Render Plugins
+        function renderPlugins() {
+            const grid = document.getElementById('plugins-grid');
+            grid.innerHTML = pluginsData.map(p => `
+                <div class="skill-card">
+                    <div class="skill-header">
+                        <div class="skill-icon">${p.icon}</div>
+                        <div class="skill-info">
+                            <div class="skill-name">${p.name}</div>
+                            <div class="skill-author">${p.author}</div>
+                        </div>
+                    </div>
+                    <div class="skill-desc">${p.desc}</div>
+                    <div class="skill-actions">
+                        <div class="skill-btn ${p.enabled ? 'installed' : 'install'}">
+                            ${p.enabled ? '✓ 已启用' : '启用'}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                const panel = item.dataset.panel;
+                showPanel(panel);
+            });
+        });
+
+        const titles = {
+            chat: '对话',
+            skills: '技能商店',
+            installed: '已安装',
+            terminal: '终端',
+            plugins: '插件',
+            dgm: 'DGM 控制',
+            settings: '设置'
+        };
+
+        function showPanel(panel) {
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(`panel-${panel}`).classList.add('active');
+            document.getElementById('page-title').textContent = titles[panel] || panel;
+        }
+
+        // Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                renderSkills(tab.dataset.filter);
+            });
+        });
+
+        // Install Skill
+        function installSkill(skillName) {
+            const skill = skillsData.find(s => s.name === skillName);
+            if (skill && !skill.installed) {
+                skill.installed = true;
+                alert(`正在安装 ${skillName}...\n\n(演示模式 - 实际安装需通过 OpenClaw CLI)`);
+                renderSkills(document.querySelector('.tab.active').dataset.filter);
+                renderInstalled();
+            }
+        }
+
+        // Chat
+        const chatInput = document.getElementById('chat-input');
+        const chatMessages = document.getElementById('chat-messages');
+
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChat();
+            }
+        });
+
+        function sendChat() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            addMessage('user', text);
+            chatInput.value = '';
+
+            setTimeout(() => {
+                addMessage('ai', getAIResponse(text));
+            }, 800);
+        }
+
+        function addMessage(type, text) {
+            const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            const html = `
+                <div class="message ${type}">
+                    <div class="message-avatar">${type === 'user' ? '👤' : '🦷'}</div>
+                    <div class="message-content">
+                        <div class="message-header">
+                            <span class="message-name">${type === 'user' ? '你' : 'OpenClaw'}</span>
+                            <span class="message-time">${time}</span>
+                        </div>
+                        <div class="message-text">${text.replace(/\n/g, '<br>')}</div>
+                    </div>
+                </div>
+            `;
+            chatMessages.insertAdjacentHTML('beforeend', html);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function getAIResponse(text) {
+            const t = text.toLowerCase();
+            if (t.includes('你好') || t.includes('hi') || t.includes('hello')) {
+                return '你好！我是 <strong>OpenClaw</strong> AI 助手 🦷<br><br>有什么可以帮你的？';
+            }
+            if (t.includes('skill') || t.includes('技能')) {
+                return '你可以去 <strong>技能商店</strong> 选购喜欢的 Skills！<br>目前有 339+ 个 Skills 可用，包括：<br>• AI 工具<br>• 开发辅助<br>• 运维工具<br>• 效率提升<br><br>点击左侧菜单的 🛠️ 技能商店 去看看吧~';
+            }
+            if (t.includes('dgm') || t.includes('自我进化')) {
+                return 'DGM (Darwin Gödel Machine) 是我们的<strong>自我改进核心</strong> 🧬<br><br>它能让 AI 代理：<br>• 自我分析和优化代码<br>• 在基准测试上验证效果<br>• 持续进化提升能力<br><br>点击左侧 🧬 DGM 控制 查看详情';
+            }
+            if (t.includes('帮助')) {
+                return `<strong>OpenClaw 控制台功能：</strong><br><br>
+• 💬 <strong>对话</strong> - 和 AI 助手聊天<br>
+• 🛠️ <strong>技能商店</strong> - 安装/管理 Skills<br>
+• 📦 <strong>已安装</strong> - 查看已装技能<br>
+• ⌨️ <strong>终端</strong> - 执行命令<br>
+• 🔌 <strong>插件</strong> - 平台接入管理<br>
+• 🧬 <strong>DGM</strong> - 自我进化控制<br>
+• ⚙️ <strong>设置</strong> - 系统配置`;
+            }
+            return `收到: "${text}"<br><br>这是演示对话。你可以：<br>• 尝试点击左侧不同菜单<br>• 去技能商店看看有哪些 Skills<br>• 体验完整的 OpenClaw 控制台界面`;
+        }
+
+        // Terminal
+        const terminalInput = document.getElementById('terminal-input');
+        if (terminalInput) {
+            terminalInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const cmd = terminalInput.value;
+                    terminalInput.value = '';
+                    const body = document.getElementById('terminal-body');
+                    body.innerHTML += `
+                        <div class="terminal-line">
+                            <span class="terminal-prompt">➜ ~</span> <span class="terminal-command">${cmd}</span>
+                        </div>
+                        <div class="terminal-line terminal-output">
+> 执行: ${cmd}<br>
+(演示模式 - 实际执行需通过 OpenClaw CLI)
+                        </div>
+                        <br>
+                        <div class="terminal-line">
+                            <span class="terminal-prompt">➜ ~</span> <input type="text" class="terminal-input" id="terminal-input" placeholder="输入命令...">
+                        </div>
+                    `;
+                }
+            });
+        }
+
+        // Init
+        renderSkills();
+        renderInstalled();
+        renderPlugins();
+    </script>
+</body>
+</html>

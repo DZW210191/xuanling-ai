@@ -1,0 +1,105 @@
+{
+  "projects": [
+    {
+      "id": 1,
+      "name": "AI 智能代理框架",
+      "description": "基于 OpenClaw 构建",
+      "icon": "🤖",
+      "status": "进行中",
+      "progress": 65,
+      "tasks": 12,
+      "memory": 5
+    },
+    {
+      "id": 2,
+      "name": "Web 控制台",
+      "description": "玄灵AI 管理界面",
+      "icon": "🌐",
+      "status": "进行中",
+      "progress": 80,
+      "tasks": 8,
+      "memory": 3
+    },
+    {
+      "id": 3,
+      "name": "test-proj",
+      "description": "已更新",
+      "icon": "📁",
+      "status": "维护中",
+      "progress": 0,
+      "tasks": 0,
+      "memory": 0,
+      "created_at": "2026-03-20T21:26:45.616668",
+      "updated_at": "2026-03-20T21:26:45.632298"
+    },
+    {
+      "id": 5,
+      "name": "TestProjE2E",
+      "description": "",
+      "icon": "📁",
+      "status": "进行中",
+      "progress": 42,
+      "tasks": 0,
+      "memory": 0,
+      "created_at": "2026-03-20T22:07:20.082968",
+      "updated_at": "2026-03-20T22:07:43.619116"
+    }
+  ],
+  "memories": [
+    {
+      "id": 1,
+      "title": "主人称呼偏好",
+      "content": "喜欢被称呼为老板",
+      "tags": [
+        "个人"
+      ],
+      "importance": 5,
+      "project_id": null
+    },
+    {
+      "id": 3,
+      "title": "AI 项目",
+      "content": "正在做 AI 项目",
+      "tags": [
+        "重要"
+      ],
+      "importance": 5,
+      "project_id": null
+    }
+  ],
+  "next_ids": {
+    "project": 7,
+    "memory": 7,
+    "agent": 5,
+    "agent_memory": 1
+  },
+  "agents": [
+    {
+      "id": 1,
+      "name": "代码审查代理",
+      "status": "running",
+      "tasks_count": 12,
+      "success_rate": 0.92,
+      "description": "自动审查代码"
+    },
+    {
+      "id": 2,
+      "name": "文档助手",
+      "status": "running",
+      "tasks_count": 8,
+      "success_rate": 1.0,
+      "description": "生成文档"
+    },
+    {
+      "id": 3,
+      "name": "网页抓取代理",
+      "status": "idle",
+      "tasks_count": 5,
+      "success_rate": 1.0,
+      "description": "抓取网页"
+    }
+  ],
+  "agent_memories": {},
+  "agent_tasks": {},
+  "channels": []
+}

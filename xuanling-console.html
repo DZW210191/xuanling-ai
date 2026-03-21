@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>玄灵AI 控制台</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {--bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--green:#3fb950;--purple:#a371f7;--accent:#58a6ff;--orange:#d29922;--red:#f85149}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Inter,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+.sidebar{width:240px;background:var(--bg2);border-right:1px solid var(--border);position:fixed;height:100vh;overflow-y:auto}
+.logo{padding:20px;font-size:1.2rem;font-weight:700;display:flex;align-items:center;gap:10px}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.nav{padding:15px}
+.nav-label{font-size:0.7rem;color:var(--text2);text-transform:uppercase;margin-bottom:10px;padding:0 10px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--text2);cursor:pointer;font-size:0.9rem}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:rgba(102,126,234,0.15);color:#a78bfa}
+.nav-item .badge{margin-left:auto;background:var(--bg3);padding:2px 8px;border-radius:10px;font-size:0.75rem}
+.main{flex:1;margin-left:240px}
+.header{height:64px;padding:0 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--bg2)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.btn{padding:8px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;font-size:0.85rem}
+.btn.primary{background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff}
+.btn:hover{opacity:0.9}
+.content{padding:24px}
+.panel{display:none}
+.panel.active{display:block}
+.section-title{font-size:1.3rem;font-weight:600;margin-bottom:20px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:12px}
+.card:hover{border-color:rgba(102,126,234,0.3)}
+.tabs{display:flex;gap:5px;margin-bottom:20px;border-bottom:1px solid var(--border)}
+.tab{padding:12px 20px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent}
+.tab.active{color:#a78bfa;border-bottom-color:#a78bfa}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.project-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;cursor:pointer;transition:0.2s}
+.project-card:hover{border-color:var(--purple);transform:translateY(-2px)}
+.project-icon{width:48px;height:48px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem}
+.progress{height:6px;background:var(--bg3);border-radius:3px;margin:12px 0}
+.progress-bar{height:100%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:3px}
+.status{padding:6px 12px;border-radius:20px;font-size:0.75rem}
+.status.active{background:rgba(63,185,80,0.15);color:var(--green)}
+.status.progress{background:rgba(210,153,34,0.15);color:var(--orange)}
+.status.done{background:rgba(88,166,255,0.15);color:var(--accent)}
+.status.idle{background:rgba(139,148,158,0.15);color:var(--text2)}
+.form-input{width:100%;padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;margin-bottom:12px}
+.form-textarea{width:100%;padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem;min-height:100px;resize:vertical}
+.modal{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:1000}
+.modal.active{display:flex}
+.modal-content{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:24px;width:500px;max-width:90vw;max-height:80vh;overflow-y:auto}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.modal-close{background:none;border:none;color:var(--text2);font-size:1.5rem;cursor:pointer}
+.toggle{width:44px;height:24px;background:var(--bg3);border-radius:12px;cursor:pointer;position:relative}
+.toggle.active{background:linear-gradient(135deg,#667eea,#764ba2)}
+.toggle::after{content:"";position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:3px;left:3px;transition:0.3s}
+.toggle.active::after{left:23px}
+.agent-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:12px}
+.agent-avatar{width:44px;height:44px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;display:flex;align-items:center;justify-content:center}
+.monitor-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px}
+.settings-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.settings-item:last-child{border:none}
+.chat-container{max-height:500px;overflow-y:auto;margin-bottom:20px}
+.chat-message{margin-bottom:16px;display:flex;gap:12px}
+.chat-message.user{flex-direction:row-reverse}
+.chat-avatar{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.chat-message.ai .chat-avatar{background:linear-gradient(135deg,#667eea,#764ba2)}
+.chat-message.user .chat-avatar{background:var(--bg3)}
+.chat-bubble{max-width:70%;padding:12px 16px;border-radius:12px;word-wrap:break-word}
+.chat-message.ai .chat-bubble{background:var(--bg3);border-bottom-left-radius:4px}
+.chat-message.user .chat-bubble{background:linear-gradient(135deg,#667eea,#764ba2);border-bottom-right-radius:4px}
+.chat-input-container{display:flex;gap:10px}
+.chat-input{flex:1;padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem}
+.chat-input:focus{outline:none;border-color:var(--purple)}
+.skill-card .skill-icon{width:40px;height:40px;background:linear-gradient(135deg,#667eea,#764ba2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem}
+.skill-card .skill-info{margin:12px 0}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;margin-bottom:8px;color:var(--text2);font-size:0.9rem}
+.form-group select{width:100%;padding:12px 16px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.9rem}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+<div class="logo"><div class="logo-icon">✨</div><span>玄灵AI</span></div>
+<div class="nav"><div class="nav-label">主菜单</div>
+<div class="nav-item" data-panel="chat"><span>💬</span>对话</div>
+<div class="nav-item" data-panel="skills"><span>🛠️</span>技能商店<span class="badge" id="badge-skills">0</span></div>
+<div class="nav-item" data-panel="projects"><span>📁</span>项目管理<span class="badge" id="badge-projects">0</span></div>
+<div class="nav-item" data-panel="tasks"><span>⚡</span>定时任务<span class="badge" id="badge-tasks">0</span></div>
+<div class="nav-item" data-panel="automation"><span>🔄</span>自动化</div>
+<div class="nav-item" data-panel="agents"><span>🤖</span>子代理<span class="badge" id="badge-agents">0</span></div>
+<div class="nav-item" data-panel="monitor"><span>📈</span>任务监控</div>
+</div>
+<div class="nav"><div class="nav-label">系统</div>
+<div class="nav-item" data-panel="memory"><span>🧠</span>记忆系统<span class="badge" id="badge-memory">0</span></div>
+<div class="nav-item" data-panel="dgm"><span>🧬</span>DGM 控制</div>
+<div class="nav-item" data-panel="permissions"><span>🔐</span>权限设置</div>
+<div class="nav-item" data-panel="settings"><span>⚙️</span>设置</div>
+</div>
+</aside>
+<main class="main">
+<header class="header"><div style="display:flex;align-items:center;gap:8px"><div class="status-dot"></div><span>在线</span></div><button class="btn primary" onclick="showNewProjectModal()">+ 新建项目</button></header>
+<div class="content">
+<div class="panel" id="panel-chat">
+<div class="section-title">💬 对话</div>
+<div class="card">
+<div class="chat-container" id="chat-container">
+<div class="chat-message ai">
+<div class="chat-avatar">✨</div>
+<div class="chat-bubble">你好！我是玄灵AI，有什么可以帮你的吗？</div>
+</div>
+</div>
+<div class="chat-input-container">
+<input type="text" class="chat-input" id="chat-input" placeholder="输入消息..." onkeypress="if(event.key==='Enter')sendMessage()">
+<button class="btn primary" onclick="sendMessage()">发送</button>
+</div>
+</div>
+</div>
+<div class="panel" id="panel-skills">
+<div class="section-title">🛠️ 技能商店</div>
+<div class="tabs"><div class="tab active" data-filter="all">全部</div><div class="tab" data-filter="ai">AI</div><div class="tab" data-filter="dev">开发</div><div class="tab" data-filter="cloud">云服务</div></div>
+<div class="grid" id="skills-grid"></div>
+</div>
+<div class="panel" id="panel-projects">
+<div class="section-title">📁 项目管理</div>
+<div class="tabs"><div class="tab active" data-filter="all">全部</div><div class="tab" data-filter="active">进行中</div><div class="tab" data-filter="done">已完成</div></div>
+<div class="grid" id="projects-grid"></div>
+</div>
+<div class="panel" id="panel-tasks">
+<div class="section-title">⚡ 定时任务</div>
+<div class="tabs"><div class="tab active" data-filter="all">全部</div><div class="tab" data-filter="active">运行中</div><div class="tab" data-filter="idle">已暂停</div></div>
+<div class="grid" id="tasks-grid"></div>
+</div>
+<div class="panel" id="panel-automation">
+<div class="section-title">🔄 自动化工作流</div>
+<div class="grid" id="automation-grid"></div>
+</div>
+<div class="panel" id="panel-agents">
+<div class="section-title">🤖 子代理管理</div>
+<div class="tabs"><div class="tab active" data-filter="all">全部</div><div class="tab" data-filter="active">运行中</div><div class="tab" data-filter="idle">空闲</div></div>
+<div class="grid" id="agents-grid"></div>
+</div>
+<div class="panel" id="panel-monitor">
+<div class="section-title">📈 任务监控</div>
+<div class="grid">
+<div class="monitor-card"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><span>CPU</span><span class="status active" id="cpu-status">35%</span></div><div class="progress"><div class="progress-bar" style="width:35%" id="cpu-bar"></div></div></div>
+<div class="monitor-card"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><span>内存</span><span class="status active" id="mem-status">48%</span></div><div class="progress"><div class="progress-bar" style="width:48%" id="mem-bar"></div></div></div>
+<div class="monitor-card"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><span>活跃任务</span><span class="status active" id="task-status">3</span></div><div class="progress"><div class="progress-bar" style="width:60%" id="task-bar"></div></div></div>
+<div class="monitor-card"><div style="display:flex;justify-content:space-between;margin-bottom:10px"><span>API</span><span class="status progress" id="api-status">85%</span></div><div class="progress"><div class="progress-bar" style="width:85%" id="api-bar"></div></div></div>
+</div>
+</div>
+<div class="panel" id="panel-memory">
+<div class="section-title">🧠 记忆系统</div>
+<div class="tabs"><div class="tab active" data-filter="all">全部</div><div class="tab" data-filter="personal">个人</div><div class="tab" data-filter="preference">偏好</div><div class="tab" data-filter="important">重要</div></div>
+<div class="grid" id="memory-grid"></div>
+</div>
+<div class="panel" id="panel-dgm">
+<div class="section-title">🧬 DGM 控制</div>
+<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:600">DGM 自我改进</div><div style="font-size:0.85rem;color:var(--text2)">Darwin Gödel Machine</div></div><div class="toggle active" id="dgm-toggle" onclick="toggleDGM()"></div></div></div>
+</div>
+<div class="panel" id="panel-permissions">
+<div class="section-title">🔐 权限设置</div>
+<div class="card" id="permissions-list"></div>
+</div>
+<div class="panel" id="panel-settings">
+<div class="section-title">⚙️ 设置</div>
+<div class="card"><label style="display:block;margin-bottom:8px;color:var(--text2)">AI 模型</label><input class="form-input" id="setting-model" value="MiniMax-M2.5"></div>
+<div class="card"><label style="display:block;margin-bottom:8px;color:var(--text2)">API 地址</label><input class="form-input" id="setting-api-url" value="https://api.minimax.chat/v1"></div>
+<div class="card"><label style="display:block;margin-bottom:8px;color:var(--text2)">API Key</label><input class="form-input" id="setting-api-key" type="password" placeholder="留空则使用环境变量"></div>
+<div class="card"><button class="btn primary" onclick="saveSettings()">保存设置</button></div>
+</div>
+</div>
+</div>
+</main>
+<div class="modal" id="project-modal"><div class="modal-content"><div class="modal-header"><h3>📁 项目详情</h3><button class="modal-close" onclick="closeModal('project-modal')">×</button></div><div id="project-detail"></div></div></div>
+<div class="modal" id="new-project-modal"><div class="modal-content"><div class="modal-header"><h3>➕ 新建项目</h3><button class="modal-close" onclick="closeModal('new-project-modal')">×</button></div><div class="form-group"><label>项目名称</label><input class="form-input" id="new-project-name" placeholder="输入项目名称"></div><div class="form-group"><label>项目描述</label><textarea class="form-textarea" id="new-project-desc" placeholder="输入项目描述"></textarea></div><div class="form-group"><label>图标</label><select id="new-project-icon"><option value="🤖">🤖 AI</option><option value="🌐">🌐 Web</option><option value="📊">📊 数据</option><option value="📁">📁 文档</option><option value="💡">💡 创意</option><option value="🔧">🔧 工具</option></select></div><button class="btn primary" style="width:100%" onclick="createProject()">创建项目</button></div></div></div>
+<script>
+var projects = [];
+var skills = [
+{name:"feishu-doc",desc:"飞书文档 API",icon:"📄",category:"cloud",installed:true},
+{name:"DGM Skill",desc:"自我改进",icon:"🧬",category:"ai",installed:true},
+{name:"tencent-cos",desc:"腾讯云存储",icon:"☁️",category:"cloud",installed:false},
+{name:"github",desc:"GitHub 操作",icon:"🐙",category:"dev",installed:false},
+{name:"weather",desc:"天气查询",icon:"🌤️",category:"ai",installed:false}
+];
+var tasks = [
+{name:"每日早间简报",time:"每天 8:00",status:"active",trigger:"定时"},
+{name:"健康检查",time:"每小时",status:"active",trigger:"定时"},
+{name:"自动备份",time:"每天 2:00",status:"idle",trigger:"定时"},
+{name:"周报汇总",time:"每周一 9:00",status:"active",trigger:"定时"}
+];
+var automations = [
+{name:"邮件自动回复",trigger:"收到邮件",status:"active"},
+{name:"GitHub PR 提醒",trigger:"Webhook",status:"active"},
+{name:"会议纪要整理",trigger:"关键词",status:"idle"}
+];
+var agents = [
+{name:"代码审查代理",desc:"负责代码质量分析",status:"active",tasks:12,success:11,time:2.3},
+{name:"文档助手",desc:"负责文档撰写整理",status:"active",tasks:8,success:8,time:5.1},
+{name:"网页抓取代理",desc:"负责网页内容获取",status:"idle",tasks:5,success:5,time:1.8}
+];
+var memories = [
+{title:"主人称呼偏好",content:'喜欢被称呼为"老板"',type:"preference"},
+{title:"最喜欢的颜色",content:"蓝色",type:"preference"},
+{title:"最喜欢的运动",content:"跑步",type:"preference"},
+{title:"AI 项目",content:"正在做 AI 项目",type:"personal"}
+];
+var permissions = [
+{name:"执行系统命令",key:"exec",enabled:true},
+{name:"安装 Skills",key:"install_skills",enabled:true},
+{name:"管理定时任务",key:"manage_tasks",enabled:true},
+{name:"管理子代理",key:"manage_agents",enabled:true},
+{name:"管理记忆",key:"manage_memory",enabled:true}
+];
+var dgmEnabled = true;
+document.addEventListener("DOMContentLoaded",function(){initNavigation();initBadges();renderSkills();renderProjects();renderTasks();renderAutomations();renderAgents();renderMemories();renderPermissions();loadSettings();});
+function loadSettings(){
+// 优先从后端加载设置
+fetch("/api/settings").then(function(res){return res.json();}).then(function(settings){
+if(settings.model)document.getElementById("setting-model").value=settings.model;
+if(settings.apiUrl)document.getElementById("setting-api-url").value=settings.apiUrl;
+}).catch(function(){
+// 失败则从本地存储加载
+var local=localStorage.getItem("xuanling_settings");
+if(local){
+var s=JSON.parse(local);
+if(s.model)document.getElementById("setting-model").value=s.model;
+if(s.apiUrl)document.getElementById("setting-api-url").value=s.apiUrl;
+}
+});
+}
+function initNavigation(){
+document.querySelectorAll(".nav-item").forEach(function(item){item.addEventListener("click",function(){
+document.querySelectorAll(".nav-item").forEach(function(i){i.classList.remove("active")});
+item.classList.add("active");
+var p=item.getAttribute("data-panel");
+document.querySelectorAll(".panel").forEach(function(pl){pl.classList.remove("active")});
+document.getElementById("panel-"+p).classList.add("active");});});
+document.querySelector("[data-panel='chat']").classList.add("active");
+document.getElementById("panel-chat").classList.add("active");
+}
+function initBadges(){
+document.getElementById("badge-skills").textContent=skills.length;
+document.getElementById("badge-projects").textContent=projects.length||3;
+document.getElementById("badge-tasks").textContent=tasks.length;
+document.getElementById("badge-agents").textContent=agents.length;
+document.getElementById("badge-memory").textContent=memories.length;
+}
+function sendMessage(){
+var input=document.getElementById("chat-input");
+var message=input.value.trim();
+if(!message)return;
+var container=document.getElementById("chat-container");
+var userMsg=document.createElement("div");
+userMsg.className="chat-message user";
+userMsg.innerHTML='<div class="chat-avatar">👤</div><div class="chat-bubble">'+escapeHtml(message)+'</div>';
+container.appendChild(userMsg);
+input.value="";
+container.scrollTop=container.scrollHeight;
+
+// 显示加载状态
+var loadingMsg=document.createElement("div");
+loadingMsg.className="chat-message ai";
+loadingMsg.id="loading-msg";
+loadingMsg.innerHTML='<div class="chat-avatar">✨</div><div class="chat-bubble">思考中...</div>';
+container.appendChild(loadingMsg);
+container.scrollTop=container.scrollHeight;
+
+// 调用后端 API
+fetch("/api/chat",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({message:message})
+}).then(function(res){return res.json();})
+.then(function(data){
+// 移除加载消息
+var loading=document.getElementById("loading-msg");
+if(loading)loading.remove();
+
+// 显示 AI 回复
+var aiMsg=document.createElement("div");
+aiMsg.className="chat-message ai";
+aiMsg.innerHTML='<div class="chat-avatar">✨</div><div class="chat-bubble">'+escapeHtml(data.response)+'</div>';
+container.appendChild(aiMsg);
+container.scrollTop=container.scrollHeight;
+})
+.catch(function(err){
+// 移除加载消息
+var loading=document.getElementById("loading-msg");
+if(loading)loading.remove();
+
+// 显示错误
+var aiMsg=document.createElement("div");
+aiMsg.className="chat-message ai";
+aiMsg.innerHTML='<div class="chat-avatar">✨</div><div class="chat-bubble">抱歉，连接服务器失败: '+escapeHtml(err.message)+'</div>';
+container.appendChild(aiMsg);
+container.scrollTop=container.scrollHeight;
+});
+}
+function escapeHtml(text){var div=document.createElement("div");div.textContent=text;return div.innerHTML;}
+function renderSkills(){
+var grid=document.getElementById("skills-grid");
+grid.innerHTML=skills.map(function(s,i){
+return '<div class="card"><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><div class="skill-icon">'+s.icon+'</div><div class="skill-info"><div style="font-weight:600">'+s.name+'</div><div style="font-size:0.8rem;color:var(--text2)">'+s.desc+'</div></div></div><button class="btn '+(s.installed?'primary':'')+'" style="width:100%" onclick="toggleSkill('+i+')">'+(s.installed?'✓ 已安装':'安装')+'</button></div>';
+}).join("");
+}
+function toggleSkill(index){
+skills[index].installed=!skills[index].installed;
+renderSkills();
+}
+function renderProjects(){
+var grid=document.getElementById("projects-grid");
+var defaultProjects=[{id:1,name:"AI 智能代理框架",desc:"基于 OpenClaw 构建",icon:"🤖",status:"active",progress:65},{id:2,name:"Web 控制台",desc:"玄灵AI 管理界面",icon:"🌐",status:"active",progress:80},{id:3,name:"数据可视化",desc:"Dashboard 搭建",icon:"📊",status:"done",progress:100}];
+var allProjects=projects.length?projects:defaultProjects;
+grid.innerHTML=allProjects.map(function(p){
+var statusClass=p.status==="active"?"progress":p.status==="done"?"done":"idle";
+var statusText=p.status==="active"?"进行中":p.status==="done"?"已完成":"空闲";
+return '<div class="project-card" onclick="openProject('+p.id+')"><div style="display:flex;justify-content:space-between"><div class="project-icon">'+p.icon+'</div><span class="status '+statusClass+'">'+statusText+'</span></div><div style="font-weight:600;margin:12px 0 8px">'+p.name+'</div><div style="font-size:0.85rem;color:var(--text2);margin-bottom:12px">'+p.desc+'</div><div class="progress"><div class="progress-bar" style="width:'+p.progress+'%"></div></div></div>';
+}).join("");
+}
+function showNewProjectModal(){document.getElementById("new-project-modal").classList.add("active");}
+function createProject(){
+var name=document.getElementById("new-project-name").value.trim();
+var desc=document.getElementById("new-project-desc").value.trim();
+var icon=document.getElementById("new-project-icon").value;
+if(!name){alert("请输入项目名称");return;}
+projects.push({id:Date.now(),name:name,desc:desc,icon:icon,status:"active",progress:0});
+renderProjects();
+document.getElementById("badge-projects").textContent=projects.length;
+closeModal("new-project-modal");
+document.getElementById("new-project-name").value="";
+document.getElementById("new-project-desc").value="";
+}
+function openProject(id){
+var p=(projects.length?projects:[{id:1,name:"AI 智能代理框架",desc:"基于 OpenClaw 构建",icon:"🤖",status:"active",progress:65},{id:2,name:"Web 控制台",desc:"玄灵AI 管理界面",icon:"🌐",status:"active",progress:80},{id:3,name:"数据可视化",desc:"Dashboard 搭建",icon:"📊",status:"done",progress:100}]).find(function(x){return x.id===id});
+if(!p)return;
+document.getElementById("project-detail").innerHTML='<div class="card" style="margin-bottom:16px"><div style="display:flex;align-items:center;gap:15px;margin-bottom:15px"><div class="project-icon">'+p.icon+'</div><div><div style="font-weight:600;font-size:1.1rem">'+p.name+'</div><div style="font-size:0.85rem;color:var(--text2)">'+p.desc+'</div></div></div><div class="progress"><div class="progress-bar" style="width:'+p.progress+'%"></div></div></div><h4 style="margin-bottom:12px">🧠 项目记忆</h4><div class="card"><div style="font-weight:600">项目目标</div><div style="font-size:0.85rem;color:var(--text2);margin-top:4px">构建下一代 AI 代理系统</div></div><div class="card"><div style="font-weight:600">技术栈</div><div style="font-size:0.85rem;color:var(--text2);margin-top:4px">OpenClaw, MiniMax-M2.5, DGM</div></div><button class="btn" style="width:100%;margin-top:12px" onclick="deleteProject('+p.id+')">🗑️ 删除项目</button>';
+document.getElementById("project-modal").classList.add("active");
+}
+function deleteProject(id){
+if(confirm("确定要删除这个项目吗？")){
+projects=projects.filter(function(p){return p.id!==id});
+renderProjects();
+closeModal("project-modal");
+}
+}
+function renderTasks(){
+var grid=document.getElementById("tasks-grid");
+grid.innerHTML=tasks.map(function(t,i){
+var statusClass=t.status==="active"?"active":"idle";
+var statusText=t.status==="active"?"运行中":"已暂停";
+return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:600">'+t.name+'</div><div style="font-size:0.85rem;color:var(--text2)">'+t.time+'</div></div><span class="status '+statusClass+'">'+statusText+'</span></div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn" onclick="toggleTask('+i+')">'+(t.status==="active"?"⏸️ 暂停":"▶️ 启动")+'</button><button class="btn" onclick="deleteTask('+i+')">🗑️</button></div></div>';
+}).join("");
+}
+function toggleTask(index){tasks[index].status=tasks[index].status==="active"?"idle":"active";renderTasks();}
+function deleteTask(index){if(confirm("确定删除这个任务？")){tasks.splice(index,1);renderTasks();}}
+function renderAutomations(){
+var grid=document.getElementById("automation-grid");
+grid.innerHTML=automations.map(function(a,i){
+var statusClass=a.status==="active"?"active":"idle";
+var statusText=a.status==="active"?"运行中":"已暂停";
+return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:600">'+a.name+'</div><div style="font-size:0.85rem;color:var(--text2)">触发: '+a.trigger+'</div></div><span class="status '+statusClass+'">'+statusText+'</span></div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn" onclick="toggleAutomation('+i+')">'+(a.status==="active"?"⏸️ 暂停":"▶️ 启动")+'</button></div></div>';
+}).join("");
+}
+function toggleAutomation(index){automations[index].status=automations[index].status==="active"?"idle":"active";renderAutomations();}
+function renderAgents(){
+var grid=document.getElementById("agents-grid");
+grid.innerHTML=agents.map(function(a,i){
+var statusClass=a.status==="active"?"active":"idle";
+var statusText=a.status==="active"?"运行中":"空闲";
+return '<div class="agent-card"><div style="display:flex;align-items:center;gap:15px"><div class="agent-avatar">'+a.name[0]+'</div><div style="flex:1"><div style="font-weight:600">'+a.name+'</div><div style="font-size:0.85rem;color:var(--text2)">'+a.desc+'</div></div><span class="status '+statusClass+'">'+statusText+'</span></div><div style="margin-top:12px;font-size:0.85rem;color:var(--text2)">📝 '+a.tasks+' 任务 • ✅ 成功 '+a.success+' • ⏱️ '+a.time+'s</div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn" onclick="toggleAgent('+i+')">'+(a.status==="active"?"⏸️ 暂停":"▶️ 启动")+'</button><button class="btn" onclick="deleteAgent('+i+')">🗑️ 删除</button></div></div>';
+}).join("");
+}
+function toggleAgent(index){agents[index].status=agents[index].status==="active"?"idle":"active";renderAgents();}
+function deleteAgent(index){if(confirm("确定删除这个子代理？")){agents.splice(index,1);renderAgents();}}
+function renderMemories(){
+var grid=document.getElementById("memory-grid");
+grid.innerHTML=memories.map(function(m,i){
+return '<div class="card"><div style="font-weight:600">'+m.title+'</div><div style="font-size:0.85rem;color:var(--text2);margin-top:8px">'+m.content+'</div><div style="margin-top:12px;display:flex;gap:8px"><button class="btn" onclick="editMemory('+i+')">✏️ 编辑</button><button class="btn" onclick="deleteMemory('+i+')">🗑️</button></div></div>';
+}).join("");
+}
+function editMemory(index){
+var newContent=prompt("编辑记忆:",memories[index].content);
+if(newContent!==null){memories[index].content=newContent;renderMemories();}
+}
+function deleteMemory(index){if(confirm("确定删除这条记忆？")){memories.splice(index,1);renderMemories();document.getElementById("badge-memory").textContent=memories.length;}}
+function renderPermissions(){
+var list=document.getElementById("permissions-list");
+list.innerHTML=permissions.map(function(p,i){
+return '<div class="settings-item"><span>'+p.name+'</span><div class="toggle '+(p.enabled?'active':'')+'" data-index="'+i+'" onclick="togglePermission('+i+')"></div></div>';
+}).join("");
+}
+function togglePermission(index){
+permissions[index].enabled=!permissions[index].enabled;
+renderPermissions();
+localStorage.setItem("xuanling_permissions",JSON.stringify(permissions));
+}
+function toggleDGM(){
+dgmEnabled=!dgmEnabled;
+document.getElementById("dgm-toggle").classList.toggle("active",dgmEnabled);
+localStorage.setItem("xuanling_dgm",dgmEnabled);
+}
+function saveSettings(){
+var model=document.getElementById("setting-model").value;
+var apiUrl=document.getElementById("setting-api-url").value;
+var apiKey=document.getElementById("setting-api-key").value||"";
+
+// 保存到本地存储 (备用)
+localStorage.setItem("xuanling_settings",JSON.stringify({model:model,apiUrl:apiUrl,apiKey:apiKey}));
+
+// 调用后端API保存到文件
+fetch("/api/settings",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({model:model,apiUrl:apiUrl,apiKey:apiKey})
+}).then(function(res){return res.json();})
+.then(function(data){
+alert("设置已保存到服务器！");
+})
+.catch(function(err){
+console.error("保存失败:",err);
+alert("本地保存成功，服务器保存失败");
+});
+}
+function closeModal(id){document.getElementById(id).classList.remove("active");}
+</script>
+</body>
+</html>
