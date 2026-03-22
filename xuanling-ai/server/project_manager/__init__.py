@@ -789,7 +789,8 @@ class ProjectManager:
             try:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     doc.content_preview = f.read(1000)
-            except:
+            except (IOError, OSError, UnicodeDecodeError) as e:
+                logger.debug(f"无法读取文件预览 {file_path}: {e}")
                 pass
         
         self._documents[doc.id] = doc

@@ -647,7 +647,8 @@ class AuditLogger:
                 if file_date < cutoff:
                     file.unlink()
                     logger.info(f"🧹 删除旧审计日志: {file.name}")
-            except:
+            except (ValueError, IndexError, OSError) as e:
+                logger.debug(f"跳过无效日志文件 {file.name}: {e}")
                 pass
 
 

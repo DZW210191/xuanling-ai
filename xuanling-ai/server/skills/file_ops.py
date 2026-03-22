@@ -162,7 +162,8 @@ class FileOpsSkill(SkillBase):
                                     })
                                     if len(results) >= 100:
                                         break
-                    except:
+                    except (IOError, OSError, PermissionError, UnicodeDecodeError) as e:
+                        logger.debug(f"跳过无法读取的文件 {file_path}: {e}")
                         pass
             
             return {

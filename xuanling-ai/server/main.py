@@ -16,7 +16,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 import uvicorn
 
@@ -125,7 +125,7 @@ _data = load_data()
 # ============== Pydantic 数据模型 (使用明确的后缀避免冲突) ==============
 
 class ChatRequest(BaseModel):
-    message: str
+    message: str = Field(..., min_length=1, max_length=10000, description="用户消息")
     project_id: Optional[int] = None
 
 class ChatResponse(BaseModel):
@@ -134,37 +134,58 @@ class ChatResponse(BaseModel):
 
 class ProjectRequest(BaseModel):
     """项目创建/更新请求"""
-    name: str
-    description: Optional[str] = ""
-    icon: str = "📁"
-    status: str = "进行中"
-    progress: int = 0
-    tasks: int = 0
-    memory: int = 0
+    name: str = Field(..., min_length=1, max_length=100, description="项目名称")
+    description: Optional[str] = Field(default="", max_length=2000, description="项目描述")
+    icon: str = Field(default="📁", max_length=10, description="项目图标")
+    status: str = Field(default="进行中", max_length=20, description="项目状态")
+    progress: int = Field(default=0, ge=0, le=100, description="进度百分比")
+    tasks: int = Field(default=0, ge=0, description="任务数量")
+    memory: int = Field(default=0, ge=0, description="记忆数量")
+    
+    @field_validator('name')
+    @classmethod
+    def name_not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('项目名称不能为空')
+        return v.strip()
 
 class MemoryRequest(BaseModel):
     """记忆创建请求"""
-    title: str
-    content: str
-    tags: List[str] = []
+    title: str = Field(..., min_length=1, max_length=200, description="记忆标题")
+    content: str = Field(..., min_length=1, max_length=50000, description="记忆内容")
+    tags: List[str] = Field(default_factory=list, description="标签列表")
     project_id: Optional[int] = None
-    importance: int = 1
+    importance: int = Field(default=1, ge=1, le=5, description="重要性等级 (1-5)")
+    
+    @field_validator('title', 'content')
+    @classmethod
+    def not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('字段不能为空')
+        return v.strip()
 
 class AgentRequest(BaseModel):
     """子代理创建请求"""
-    name: str
-    description: Optional[str] = ""
-    status: Optional[str] = "idle"
+    name: str = Field(..., min_length=1, max_length=50, description="代理名称")
+    description: Optional[str] = Field(default="", max_length=500, description="代理描述")
+    status: Optional[str] = Field(default="idle", max_length=20, description="代理状态")
+    
+    @field_validator('name')
+    @classmethod
+    def name_not_empty(cls, v):
+        if not v or not v.strip():
+            raise ValueError('代理名称不能为空')
+        return v.strip()
 
 class AgentMemoryRequest(BaseModel):
     """子代理记忆请求"""
-    title: str
-    content: Optional[str] = ""
+    title: str = Field(..., min_length=1, max_length=200, description="记忆标题")
+    content: Optional[str] = Field(default="", max_length=10000, description="记忆内容")
 
 class SettingsRequest(BaseModel):
     """设置请求"""
-    model: str
-    apiUrl: str
+    model: str = Field(..., min_length=1, max_length=100, description="模型名称")
+    apiUrl: str = Field(..., min_length=1, max_length=500, description="API 地址")
     apiKey: Optional[str] = None
 
 class ChannelRequest(BaseModel):
@@ -506,7 +527,8 @@ def get_monitor():
             "api_usage": 0,
             "cache": cache.get_stats()
         }
-    except:
+    except Exception as e:
+        logger.warning(f"获取监控数据失败: {e}")
         return {
             "cpu": 35, 
             "memory": 48, 
