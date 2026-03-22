@@ -1510,10 +1510,12 @@ def restart_server():
     def restart_background():
         import time
         time.sleep(2)
-        subprocess.Popen([
-            sys.executable, "-m", "uvicorn", 
-            "main:app", "--host", SERVER_HOST, "--port", str(SERVER_PORT)
-        ], cwd=str(BASE_DIR), stdout=open("/tmp/xuanling.log", "a"), stderr=subprocess.STDOUT)
+        # 使用 with 语句确保文件句柄正确关闭
+        with open("/tmp/xuanling.log", "a") as log_file:
+            subprocess.Popen([
+                sys.executable, "-m", "uvicorn", 
+                "main:app", "--host", SERVER_HOST, "--port", str(SERVER_PORT)
+            ], cwd=str(BASE_DIR), stdout=log_file, stderr=subprocess.STDOUT)
     
     thread = threading.Thread(target=restart_background)
     thread.start()
