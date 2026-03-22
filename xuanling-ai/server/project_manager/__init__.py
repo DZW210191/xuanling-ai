@@ -294,11 +294,33 @@ class TaskParser:
                 with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read()
             elif file_path.suffix in ['.docx', '.doc']:
-                # TODO: 使用 python-docx 解析
-                content = f"[Word文档: {document.original_name}]"
+                # 使用 python-docx 解析 Word 文档
+                try:
+                    from docx import Document
+                    doc = Document(file_path)
+                    content = '\n'.join([p.text for p in doc.paragraphs if p.text.strip()])
+                    logger.info(f"成功解析 Word 文档: {document.original_name}, 提取 {len(content)} 字符")
+                except ImportError:
+                    logger.warning("python-docx 未安装，无法解析 Word 文档")
+                    content = f"[Word文档: {document.original_name} - 需安装 python-docx]"
+                except Exception as e:
+                    logger.error(f"解析 Word 文档失败: {e}")
+                    content = f"[Word文档解析失败: {e}]"
             elif file_path.suffix == '.pdf':
-                # TODO: 使用 PyPDF2 解析
-                content = f"[PDF文档: {document.original_name}]"
+                # 使用 PyPDF2 解析 PDF 文档
+                try:
+                    import PyPDF2
+                    with open(file_path, 'rb') as pdf_file:
+                        reader = PyPDF2.PdfReader(pdf_file)
+                        pages = [page.extract_text() for page in reader.pages if page.extract_text()]
+                        content = '\n'.join(pages)
+                        logger.info(f"成功解析 PDF 文档: {document.original_name}, 共 {len(reader.pages)} 页, 提取 {len(content)} 字符")
+                except ImportError:
+                    logger.warning("PyPDF2 未安装，无法解析 PDF 文档")
+                    content = f"[PDF文档: {document.original_name} - 需安装 PyPDF2]"
+                except Exception as e:
+                    logger.error(f"解析 PDF 文档失败: {e}")
+                    content = f"[PDF文档解析失败: {e}]"
             else:
                 content = f"[文档: {document.original_name}]"
             

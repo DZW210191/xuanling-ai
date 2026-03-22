@@ -58,6 +58,10 @@ class ToolRegistry:
         self._categories: Dict[str, List[str]] = {}
         self._permission_manager = None
         self._lock = threading.Lock()
+    
+    def set_permission_manager(self, manager):
+        """设置权限管理器"""
+        self._permission_manager = manager
         
     def register(self, tool: ToolDefinition) -> bool:
         """注册工具"""
@@ -116,8 +120,28 @@ class ToolRegistry:
         
         # 权限检查
         if tool.requires_auth and self._permission_manager:
-            if not self._permission_manager.check(name, context):
-                return {"error": f"无权限执行 {name}", "success": False}
+            # 从 context 获取用户信息
+            user_id = context.get("user_id") if context else None
+            if user_id:
+                try:
+                    from security import Permission, permission_manager
+                    # 根据工具类别确定需要的权限
+                    permission_map = {
+                        "file": [Permission.READ_FILE, Permission.WRITE_FILE],
+                        "system": [Permission.EXEC_COMMAND],
+                        "network": [Permission.NETWORK_ACCESS],
+                    }
+                    required_perms = permission_map.get(tool.category, [])
+                    has_permission = any(
+                        self._permission_manager.check_permission(user_id, perm)
+                        for perm in required_perms
+                    ) if required_perms else True
+                    if not has_permission:
+                        return {"error": f"无权限执行 {name}", "success": False}
+                except ImportError:
+                    logger.debug("security 模块未加载，跳过权限检查")
+                except Exception as e:
+                    logger.warning(f"权限检查失败: {e}")
         
         # 危险操作警告
         if tool.dangerous:
@@ -390,12 +414,59 @@ async def tool_send_message(channel: str, message: str, target: str = None) -> D
 # ----- 搜索工具 -----
 
 async def tool_web_search(query: str, max_results: int = 5) -> Dict:
-    """网络搜索"""
-    return {
-        "success": False,
-        "error": "搜索功能未配置 API Key",
-        "hint": "请配置 TAVILY_API_KEY 或 BING_API_KEY"
-    }
+    """网络搜索 - 支持 Tavily API"""
+    tavily_api_key = os.getenv("TAVILY_API_KEY")
+    
+    if not tavily_api_key:
+        return {
+            "success": False,
+            "error": "搜索功能未配置 API Key",
+            "hint": "请设置环境变量 TAVILY_API_KEY (推荐) 或 BING_API_KEY",
+            "setup_guide": "1. 访问 https://tavily.com 获取免费 API Key\n2. export TAVILY_API_KEY=your_key"
+        }
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Tavily Search API
+            payload = {
+                "api_key": tavily_api_key,
+                "query": query,
+                "max_results": max_results,
+                "search_depth": "basic"
+            }
+            
+            async with session.post(
+                "https://api.tavily.com/search",
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    results = []
+                    for r in data.get("results", []):
+                        results.append({
+                            "title": r.get("title", ""),
+                            "url": r.get("url", ""),
+                            "content": r.get("content", "")[:500],
+                            "score": r.get("score", 0)
+                        })
+                    return {
+                        "success": True,
+                        "query": query,
+                        "results": results,
+                        "count": len(results)
+                    }
+                else:
+                    error = await resp.text()
+                    return {
+                        "success": False,
+                        "error": f"Tavily API 错误: {resp.status}",
+                        "details": error[:200]
+                    }
+    except asyncio.TimeoutError:
+        return {"success": False, "error": "搜索请求超时"}
+    except Exception as e:
+        return {"success": False, "error": f"搜索失败: {str(e)}"}
 
 
 # ============== 注册内置工具 ==============

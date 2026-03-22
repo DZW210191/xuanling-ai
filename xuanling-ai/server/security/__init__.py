@@ -814,7 +814,17 @@ security_middleware = SecurityMiddleware(
 # ============== 便捷函数 ==============
 
 def get_admin_key() -> str:
-    """获取管理员 API Key"""
+    """获取管理员 API Key (脱敏显示，仅供调试)"""
+    admin = permission_manager.get_user("admin")
+    if admin and admin.api_keys:
+        api_key = permission_manager._api_keys.get(admin.api_keys[0])
+        if api_key:
+            # 安全：只返回脱敏后的密钥，不返回完整值
+            return f"{api_key.key[:8]}...{api_key.key[-4:]}"
+    return ""
+
+def get_admin_key_full() -> str:
+    """获取完整管理员 API Key (仅限内部使用，不要暴露给外部)"""
     admin = permission_manager.get_user("admin")
     if admin and admin.api_keys:
         api_key = permission_manager._api_keys.get(admin.api_keys[0])
