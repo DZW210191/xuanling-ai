@@ -452,9 +452,35 @@ def get_models():
     }
 
 @app.post("/api/models/{provider_id}/activate")
-def activate_model(provider_id: str):
-    """激活模型"""
-    return {"status": "ok"}
+def activate_model(provider_id: str, request: dict = None):
+    """激活模型并保存配置"""
+    global app_settings
+    
+    if request:
+        # 更新设置
+        app_settings["model"] = request.get("model", app_settings.get("model", ""))
+        app_settings["apiUrl"] = request.get("api_url", app_settings.get("apiUrl", ""))
+        if request.get("api_key"):
+            app_settings["apiKey"] = request.get("api_key")
+        
+        # 配置 AI 引擎
+        ai_engine.configure(
+            api_key=app_settings.get("apiKey", ""),
+            api_url=app_settings.get("apiUrl", ""),
+            model=app_settings.get("model", "")
+        )
+        
+        # 保存到文件
+        save_settings_to_file(app_settings)
+    
+    return {
+        "status": "ok",
+        "message": f"模型 {provider_id} 已激活",
+        "config": {
+            "model": app_settings.get("model", ""),
+            "api_url": app_settings.get("apiUrl", "")
+        }
+    }
 
 # ============== 监控 API ==============
 
