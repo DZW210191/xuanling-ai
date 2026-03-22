@@ -47,7 +47,7 @@ from security import (
 from project_manager import (
     project_manager, Project as PMProject, ProjectTask, ProjectDocument,
     ProjectStatus, TaskStatus as PTaskStatus, TaskPriority as PTaskPriority,
-    DocumentType
+    DocumentType, PROJECTS_DIR
 )
 
 # ============== 日志配置 ==============
@@ -667,6 +667,179 @@ def api_resume_subagent(agent_id: str):
     agent.resume()
     return {"success": True, "status": "running"}
 
+# ============== 前端兼容: 子代理 API (/api/agents) ==============
+
+@app.get("/api/agents")
+def api_list_agents_compat():
+    """获取所有子代理 (前端兼容)"""
+    # 从数据文件和调度器合并数据
+    agents_list = []
+    
+    # 从数据文件获取
+    for a in _data.get("agents", []):
+        agent_id = a.get("id")
+        scheduler_agent = task_scheduler._agents.get(str(agent_id))
+        agents_list.append({
+            "id": agent_id,
+            "name": a.get("name", "未命名"),
+            "description": a.get("description", ""),
+            "status": scheduler_agent._state if scheduler_agent else a.get("status", "idle"),
+            "tasks_count": len(_data.get("agent_tasks", {}).get(str(agent_id), [])),
+            "success_rate": a.get("success_rate", 0.85)
+        })
+    
+    # 如果没有数据文件中的代理，返回调度器中的
+    if not agents_list:
+        for aid, agent in task_scheduler._agents.items():
+            agents_list.append({
+                "id": aid,
+                "name": agent.name,
+                "description": f"角色: {agent.role.value}",
+                "status": agent._state,
+                "tasks_count": len(agent._task_history),
+                "success_rate": 0.90
+            })
+    
+    return {"agents": agents_list}
+
+@app.post("/api/agents")
+def api_create_agent_compat(agent: AgentRequest):
+    """创建子代理 (前端兼容)"""
+    with data_lock:
+        agent_id = _data["next_ids"]["agent"]
+        _data["next_ids"]["agent"] += 1
+        
+        new_agent = {
+            "id": agent_id,
+            "name": agent.name,
+            "description": agent.description or "",
+            "status": agent.status or "idle",
+            "success_rate": 0.85,
+            "created_at": datetime.now().isoformat()
+        }
+        
+        if "agents" not in _data:
+            _data["agents"] = []
+        _data["agents"].append(new_agent)
+        
+        # 初始化记忆和任务
+        if "agent_memories" not in _data:
+            _data["agent_memories"] = {}
+        if "agent_tasks" not in _data:
+            _data["agent_tasks"] = {}
+        _data["agent_memories"][str(agent_id)] = {}
+        _data["agent_tasks"][str(agent_id)] = []
+        
+        save_data(_data)
+    
+    return {"status": "ok", "agent": new_agent}
+
+@app.get("/api/agents/{agent_id}")
+def api_get_agent_compat(agent_id: str):
+    """获取子代理详情 (前端兼容)"""
+    agent_data = None
+    for a in _data.get("agents", []):
+        if str(a.get("id")) == str(agent_id):
+            agent_data = a
+            break
+    
+    if not agent_data:
+        # 尝试从调度器获取
+        scheduler_agent = task_scheduler._agents.get(agent_id)
+        if scheduler_agent:
+            return {
+                "id": agent_id,
+                "name": scheduler_agent.name,
+                "description": f"角色: {scheduler_agent.role.value}",
+                "status": scheduler_agent._state,
+                "tasks_count": len(scheduler_agent._task_history),
+                "success_rate": 0.90
+            }
+        raise HTTPException(status_code=404, detail="代理不存在")
+    
+    return {
+        "id": agent_data.get("id"),
+        "name": agent_data.get("name", "未命名"),
+        "description": agent_data.get("description", ""),
+        "status": agent_data.get("status", "idle"),
+        "tasks_count": len(_data.get("agent_tasks", {}).get(str(agent_id), [])),
+        "success_rate": agent_data.get("success_rate", 0.85)
+    }
+
+@app.put("/api/agents/{agent_id}")
+def api_update_agent_compat(agent_id: str, agent: AgentRequest):
+    """更新子代理 (前端兼容)"""
+    with data_lock:
+        found = False
+        for i, a in enumerate(_data.get("agents", [])):
+            if str(a.get("id")) == str(agent_id):
+                _data["agents"][i]["name"] = agent.name
+                _data["agents"][i]["description"] = agent.description or ""
+                _data["agents"][i]["status"] = agent.status or "idle"
+                _data["agents"][i]["updated_at"] = datetime.now().isoformat()
+                found = True
+                break
+        
+        if not found:
+            raise HTTPException(status_code=404, detail="代理不存在")
+        
+        save_data(_data)
+    
+    return {"status": "ok", "message": "代理已更新"}
+
+@app.delete("/api/agents/{agent_id}")
+def api_delete_agent_compat(agent_id: str):
+    """删除子代理 (前端兼容)"""
+    with data_lock:
+        original_len = len(_data.get("agents", []))
+        _data["agents"] = [a for a in _data.get("agents", []) if str(a.get("id")) != str(agent_id)]
+        
+        if len(_data["agents"]) == original_len:
+            raise HTTPException(status_code=404, detail="代理不存在")
+        
+        # 清理关联数据
+        _data.get("agent_memories", {}).pop(str(agent_id), None)
+        _data.get("agent_tasks", {}).pop(str(agent_id), None)
+        
+        save_data(_data)
+    
+    return {"status": "ok", "message": "代理已删除"}
+
+@app.get("/api/agents/{agent_id}/memory")
+def api_get_agent_memory_compat(agent_id: str):
+    """获取子代理记忆 (前端兼容)"""
+    memories = _data.get("agent_memories", {}).get(str(agent_id), {})
+    return {"memories": memories}
+
+@app.post("/api/agents/{agent_id}/memory")
+def api_add_agent_memory_compat(agent_id: str, memory: AgentMemoryRequest):
+    """添加子代理记忆 (前端兼容)"""
+    with data_lock:
+        if "agent_memories" not in _data:
+            _data["agent_memories"] = {}
+        if str(agent_id) not in _data["agent_memories"]:
+            _data["agent_memories"][str(agent_id)] = {}
+        
+        memory_id = _data["next_ids"].get("agent_memory", 1)
+        _data["next_ids"]["agent_memory"] = memory_id + 1
+        
+        _data["agent_memories"][str(agent_id)][str(memory_id)] = {
+            "id": memory_id,
+            "title": memory.title,
+            "content": memory.content or "",
+            "created_at": datetime.now().isoformat()
+        }
+        
+        save_data(_data)
+    
+    return {"status": "ok", "message": "记忆已添加"}
+
+@app.get("/api/agents/{agent_id}/tasks")
+def api_get_agent_tasks_compat(agent_id: str):
+    """获取子代理任务历史 (前端兼容)"""
+    tasks = _data.get("agent_tasks", {}).get(str(agent_id), [])
+    return {"tasks": tasks}
+
 # ============== 任务系统 API ==============
 
 @app.get("/api/tasks/stats")
@@ -758,6 +931,63 @@ def api_get_working_memory():
     """获取工作记忆"""
     memories = memory_manager.get_working_memory()
     return {"memories": [m.to_dict() for m in memories]}
+
+# ============== 前端兼容: 记忆 API (/memory) ==============
+
+@app.get("/memory")
+def api_list_memory_compat():
+    """获取记忆列表 (前端兼容)"""
+    memories = []
+    for m in _data.get("memories", []):
+        memories.append({
+            "id": m.get("id"),
+            "title": m.get("title", ""),
+            "content": m.get("content", ""),
+            "tags": m.get("tags", []),
+            "project_id": m.get("project_id"),
+            "importance": m.get("importance", 1),
+            "created_at": m.get("created_at")
+        })
+    return {"memories": memories}
+
+@app.post("/memory")
+def api_create_memory_compat(memory: MemoryRequest):
+    """创建记忆 (前端兼容)"""
+    with data_lock:
+        memory_id = _data["next_ids"]["memory"]
+        _data["next_ids"]["memory"] += 1
+        
+        new_memory = {
+            "id": memory_id,
+            "title": memory.title,
+            "content": memory.content,
+            "tags": memory.tags or [],
+            "project_id": memory.project_id,
+            "importance": memory.importance,
+            "created_at": datetime.now().isoformat()
+        }
+        
+        if "memories" not in _data:
+            _data["memories"] = []
+        _data["memories"].append(new_memory)
+        
+        save_data(_data)
+    
+    return {"status": "ok", "memory": new_memory}
+
+@app.delete("/memory/{memory_id}")
+def api_delete_memory_compat(memory_id: str):
+    """删除记忆 (前端兼容)"""
+    with data_lock:
+        original_len = len(_data.get("memories", []))
+        _data["memories"] = [m for m in _data.get("memories", []) if str(m.get("id")) != str(memory_id)]
+        
+        if len(_data["memories"]) == original_len:
+            raise HTTPException(status_code=404, detail="记忆不存在")
+        
+        save_data(_data)
+    
+    return {"status": "ok", "message": "记忆已删除"}
 
 # ============== 安全系统 API ==============
 
@@ -915,6 +1145,20 @@ def api_update_project_task(task_id: str, request: CreateTaskRequest):
         raise HTTPException(status_code=404, detail="任务不存在")
     return {"success": True, "task": task.to_dict()}
 
+# ============== 前端兼容: 任务状态更新 API ==============
+
+@app.put("/api/tasks/{task_id}")
+def api_update_task_status_compat(task_id: str, request: dict):
+    """更新任务状态 (前端兼容)"""
+    status = request.get("status")
+    if not status:
+        raise HTTPException(status_code=400, detail="缺少 status 参数")
+    
+    task = project_manager.update_task(task_id, status=status)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return {"success": True, "task": task.to_dict()}
+
 @app.delete("/api/project-tasks/{task_id}")
 def api_delete_project_task(task_id: str):
     """删除项目任务"""
@@ -993,6 +1237,142 @@ def api_delete_document(document_id: str):
 def api_project_manager_stats():
     """获取项目管理统计"""
     return project_manager.get_stats()
+
+# ============== 前端兼容: 项目文件管理 API ==============
+
+@app.get("/project-manager/projects/{project_name}")
+def api_get_project_files_compat(project_name: str):
+    """获取项目文件列表 (前端兼容)"""
+    # 查找项目
+    project = None
+    for p in _data.get("projects", []):
+        if p.get("name") == project_name:
+            project = p
+            break
+    
+    # 也检查 project_manager
+    pm_project = project_manager.get_project(project_name)
+    
+    if not project and not pm_project:
+        return {"error": f"项目不存在: {project_name}", "files": [], "project": {}}
+    
+    # 检查项目目录
+    project_dir = PROJECTS_DIR / project_name
+    if not project_dir.exists():
+        return {
+            "project": project or (pm_project.to_dict() if pm_project else {}),
+            "files": [],
+            "error": None
+        }
+    
+    # 扫描文件
+    files = []
+    for item in project_dir.rglob("*"):
+        if item.is_file():
+            rel_path = str(item.relative_to(project_dir))
+            files.append({
+                "path": rel_path,
+                "size": item.stat().st_size,
+                "modified": datetime.fromtimestamp(item.stat().st_mtime).isoformat()
+            })
+    
+    return {
+        "project": project or (pm_project.to_dict() if pm_project else {}),
+        "files": files,
+        "error": None
+    }
+
+@app.get("/project-manager/projects/{project_name}/files/{file_path:path}")
+def api_get_project_file_content(project_name: str, file_path: str):
+    """获取项目文件内容 (前端兼容)"""
+    full_path = PROJECTS_DIR / project_name / file_path
+    
+    if not full_path.exists():
+        raise HTTPException(status_code=404, detail=f"文件不存在: {file_path}")
+    
+    if not full_path.is_file():
+        raise HTTPException(status_code=400, detail=f"不是文件: {file_path}")
+    
+    # 检查文件大小
+    if full_path.stat().st_size > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="文件太大，无法预览")
+    
+    try:
+        content = full_path.read_text(encoding='utf-8', errors='replace')
+        return {"content": content, "path": file_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"读取文件失败: {str(e)}")
+
+@app.put("/project-manager/projects/{project_name}/files/{file_path:path}")
+def api_update_project_file_content(project_name: str, file_path: str, request: dict):
+    """更新项目文件内容 (前端兼容)"""
+    full_path = PROJECTS_DIR / project_name / file_path
+    
+    # 确保目录存在
+    full_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    content = request.get("content", "")
+    
+    try:
+        full_path.write_text(content, encoding='utf-8')
+        return {"success": True, "message": "文件已保存", "path": file_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"保存文件失败: {str(e)}")
+
+@app.post("/project-manager/projects")
+def api_create_project_compat(request: dict):
+    """创建项目 (前端兼容)"""
+    name = request.get("name")
+    if not name:
+        raise HTTPException(status_code=400, detail="项目名称不能为空")
+    
+    description = request.get("description", "")
+    
+    # 检查是否已存在
+    for p in _data.get("projects", []):
+        if p.get("name") == name:
+            return {"error": "项目名称已存在", "project": None}
+    
+    # 创建项目
+    project = project_manager.create_project(
+        name=name,
+        description=description,
+        icon="📁"
+    )
+    
+    # 也添加到 _data
+    with data_lock:
+        if "projects" not in _data:
+            _data["projects"] = []
+        _data["projects"].append({
+            "id": project.id,
+            "name": name,
+            "description": description,
+            "icon": "📁",
+            "status": "draft",
+            "created_at": datetime.now().isoformat()
+        })
+        save_data(_data)
+    
+    return {"status": "ok", "project": project.to_dict()}
+
+@app.delete("/project-manager/projects/{project_name}")
+def api_delete_project_compat(project_name: str):
+    """删除项目 (前端兼容)"""
+    # 从 project_manager 删除
+    success = project_manager.delete_project(project_name)
+    
+    # 从 _data 中删除
+    with data_lock:
+        original_len = len(_data.get("projects", []))
+        _data["projects"] = [p for p in _data.get("projects", []) if p.get("name") != project_name]
+        
+        if len(_data["projects"]) == original_len and not success:
+            raise HTTPException(status_code=404, detail="项目不存在")
+        
+        save_data(_data)
+    
+    return {"status": "ok", "message": "项目已删除"}
 
 # ============== 频道管理 API ==============
 

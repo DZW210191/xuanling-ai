@@ -266,24 +266,59 @@ async def tool_exec_command(command: str, timeout: int = 30, cwd: str = None) ->
     try:
         # 更完整的危险命令检查
         dangerous_patterns = [
+            # 文件删除
             r"rm\s+(-[rf]+\s+|.*\s+-[rf]+)",  # rm -rf 变体
             r"rm\s+.*(/\s*$|/\s+)",  # rm 删除目录
+            r"find\s+.*-delete",  # find -delete
+            r"xargs\s+rm",  # xargs rm
+            
+            # 磁盘操作
             r"mkfs",  # 格式化
             r"dd\s+if=.*of=/dev/",  # dd 写入设备
             r">\s*/dev/sd",  # 写入磁盘设备
             r">\s*/dev/hd",  # 写入 IDE 磁盘
+            r">\s*/dev/nvme",  # 写入 NVMe
+            
+            # 权限修改
             r"chmod\s+(-R\s+)?777",  # 危险权限
+            r"chmod\s+(-R\s+)?a\+rwx",  # 危险权限
             r"chown\s+.*:\s*",  # 修改所有者
+            
+            # 系统破坏
             r":\(\)\s*\{\s*:\|:&\s*\}\s*;:",  # Fork bomb
+            r">\s*/dev/mem",  # 写入内存
+            r">\s*/dev/port",  # 写入端口
+            
+            # 进程控制
             r"kill\s+-9\s+-1",  # 杀死所有进程
             r"killall\s+",  # 杀死所有进程
+            r"pkill\s+-9",  # 强制杀死进程组
+            
+            # 系统控制
             r"shutdown",  # 关机
             r"reboot",  # 重启
             r"init\s+[06]",  # 关机/重启
+            r"systemctl\s+(stop|disable)",  # 停止系统服务
+            
+            # 远程执行
             r"curl.*\|\s*(ba)?sh",  # 远程执行脚本
             r"wget.*\|\s*(ba)?sh",  # 远程执行脚本
+            r"curl.*\|\s*sudo",  # 远程执行 sudo
+            r"wget.*\|\s*sudo",  # 远程执行 sudo
+            
+            # 系统配置
             r">\s*/etc/",  # 修改系统配置
+            r">\s*/boot/",  # 修改启动配置
             r"mv\s+.*\s+/(dev|proc|sys)",  # 移动到系统目录
+            
+            # 清空文件
+            r">\s+/etc/passwd",  # 清空密码文件
+            r">\s+/etc/shadow",  # 清空影子文件
+            r":>|>:",  # 清空文件
+            
+            # 危险管道
+            r"\|\s*sudo\s+rm",  # 管道到 sudo rm
+            r"\|\s*xargs\s+rm",  # 管道到 xargs rm
         ]
         
         import re

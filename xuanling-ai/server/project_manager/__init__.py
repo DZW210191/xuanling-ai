@@ -463,30 +463,93 @@ class ProjectManager:
         return project
     
     def delete_project(self, project_id: str) -> bool:
-        """删除项目"""
+        """删除项目 (带事务保护)"""
         if project_id not in self._projects:
             return False
         
         project = self._projects[project_id]
+        project_name = project.name
         
-        # 删除关联的任务和文档
-        for task_id in project.tasks:
-            self._tasks.pop(task_id, None)
-        for doc_id in project.documents:
-            doc = self._documents.pop(doc_id, None)
-            if doc and Path(doc.file_path).exists():
-                Path(doc.file_path).unlink()
+        # 备份当前数据状态
+        backup_data = {
+            "project": project.to_dict(),
+            "tasks": {tid: self._tasks.get(tid).to_dict() if self._tasks.get(tid) else None 
+                      for tid in project.tasks},
+            "documents": {did: self._documents.get(did).to_dict() if self._documents.get(did) else None 
+                         for did in project.documents}
+        }
         
-        # 删除项目文件夹
-        project_dir = PROJECTS_DIR / project_id
-        if project_dir.exists():
-            shutil.rmtree(project_dir)
-        
-        del self._projects[project_id]
-        self._save()
-        
-        logger.info(f"🗑️ 删除项目: {project.name}")
-        return True
+        try:
+            # 1. 删除关联的任务
+            for task_id in project.tasks:
+                self._tasks.pop(task_id, None)
+            
+            # 2. 删除关联的文档文件
+            deleted_docs = []
+            for doc_id in project.documents:
+                doc = self._documents.pop(doc_id, None)
+                if doc:
+                    doc_path = Path(doc.file_path)
+                    if doc_path.exists():
+                        try:
+                            doc_path.unlink()
+                            deleted_docs.append(doc_id)
+                        except Exception as e:
+                            logger.warning(f"删除文档文件失败: {doc_path} - {e}")
+            
+            # 3. 删除项目文件夹
+            project_dir = PROJECTS_DIR / project_id
+            if project_dir.exists():
+                try:
+                    shutil.rmtree(project_dir)
+                except Exception as e:
+                    logger.warning(f"删除项目文件夹失败: {project_dir} - {e}")
+            
+            # 4. 从项目列表中移除
+            del self._projects[project_id]
+            
+            # 5. 保存数据
+            self._save()
+            
+            logger.info(f"🗑️ 删除项目: {project_name} (任务: {len(project.tasks)}, 文档: {len(deleted_docs)})")
+            return True
+            
+        except Exception as e:
+            logger.error(f"删除项目失败，正在回滚: {e}")
+            
+            # 回滚操作
+            try:
+                # 恢复项目
+                self._projects[project_id] = project
+                
+                # 恢复任务
+                for task_id, task_data in backup_data["tasks"].items():
+                    if task_data:
+                        # 重新创建任务对象
+                        self._tasks[task_id] = ProjectTask(
+                            id=task_data.get("id"),
+                            title=task_data.get("title", ""),
+                            description=task_data.get("description", ""),
+                            project_id=project_id
+                        )
+                
+                # 恢复文档记录
+                for doc_id, doc_data in backup_data["documents"].items():
+                    if doc_data:
+                        self._documents[doc_id] = ProjectDocument(
+                            id=doc_data.get("id"),
+                            filename=doc_data.get("filename", ""),
+                            original_name=doc_data.get("original_name", ""),
+                            file_path=doc_data.get("file_path", ""),
+                            project_id=project_id
+                        )
+                
+                self._save()
+                logger.info(f"项目删除已回滚: {project_name}")
+            except Exception as rollback_err:
+                logger.error(f"回滚失败: {rollback_err}")
+            
+            return False
     
     def list_projects(self, status: ProjectStatus = None, owner: str = None) -> List[Project]:
         """列出项目"""

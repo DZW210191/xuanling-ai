@@ -317,18 +317,51 @@ class MemoryManager:
                 logger.error(f"加载记忆失败: {e}")
     
     def _save(self):
-        """保存记忆"""
+        """保存记忆 (带备份和错误恢复)"""
         memory_file = self._get_memory_file()
+        backup_file = self.storage_path / "memories_backup.json"
+        
         try:
+            # 1. 先备份现有数据
+            if memory_file.exists():
+                try:
+                    import shutil
+                    shutil.copy2(memory_file, backup_file)
+                except Exception as backup_err:
+                    logger.warning(f"创建备份失败: {backup_err}")
+            
+            # 2. 写入临时文件
+            temp_file = self.storage_path / "memories_temp.json"
             data = {
                 "memories": [m.to_dict() for m in self._memories.values()],
                 "short_term": self._short_term,
                 "updated_at": datetime.now().isoformat()
             }
-            with open(memory_file, 'w', encoding='utf-8') as f:
+            
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
+            
+            # 3. 原子替换
+            temp_file.replace(memory_file)
+            
+            # 4. 验证
+            if memory_file.exists() and memory_file.stat().st_size > 0:
+                logger.debug(f"记忆保存成功: {len(self._memories)} 条")
+            else:
+                raise IOError("保存后文件无效")
+                
+        except IOError as e:
+            logger.error(f"保存记忆失败 (IO错误): {e}")
+            # 尝试从备份恢复
+            if backup_file.exists():
+                try:
+                    import shutil
+                    shutil.copy2(backup_file, memory_file)
+                    logger.info("已从备份恢复记忆数据")
+                except Exception as restore_err:
+                    logger.error(f"恢复备份失败: {restore_err}")
         except Exception as e:
-            logger.error(f"保存记忆失败: {e}")
+            logger.error(f"保存记忆失败: {e}", exc_info=True)
     
     async def remember(
         self,
