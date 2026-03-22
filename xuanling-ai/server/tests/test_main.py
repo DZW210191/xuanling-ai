@@ -84,6 +84,66 @@ class TestBasicRoutes:
         assert response.status_code == 200
 
 
+class TestAgentsAPI:
+    """子代理 API 测试"""
+    
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+    
+    def test_list_agents(self, client):
+        """测试获取子代理列表"""
+        response = client.get("/api/agents")
+        assert response.status_code == 200
+        data = response.json()
+        assert "agents" in data
+    
+    def test_create_agent(self, client):
+        """测试创建子代理"""
+        response = client.post(
+            "/api/agents",
+            json={"name": "测试代理", "description": "测试用"}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+    
+    def test_get_agent_not_found(self, client):
+        """测试获取不存在的子代理"""
+        response = client.get("/api/agents/nonexistent_id")
+        assert response.status_code == 404
+
+
+class TestMemoryAPI:
+    """记忆 API 测试"""
+    
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+    
+    def test_list_memory_compat(self, client):
+        """测试获取记忆列表 (兼容路由)"""
+        response = client.get("/memory")
+        assert response.status_code == 200
+        data = response.json()
+        assert "memories" in data
+    
+    def test_create_memory_compat(self, client):
+        """测试创建记忆 (兼容路由)"""
+        response = client.post(
+            "/memory",
+            json={"title": "测试记忆", "content": "这是测试内容", "tags": ["test"]}
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
+    
+    def test_delete_memory_not_found(self, client):
+        """测试删除不存在的记忆"""
+        response = client.delete("/memory/nonexistent_id")
+        assert response.status_code == 404
+
+
 class TestToolsAPI:
     """工具 API 测试"""
     
@@ -143,6 +203,21 @@ class TestProjectsAPI:
         assert response.status_code == 404
 
 
+class TestProjectFileManager:
+    """项目文件管理 API 测试"""
+    
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+    
+    def test_get_project_files_not_found(self, client):
+        """测试获取不存在的项目文件"""
+        response = client.get("/project-manager/projects/nonexistent_project")
+        assert response.status_code == 200
+        data = response.json()
+        assert "error" in data or "files" in data
+
+
 class TestSecurity:
     """安全测试"""
     
@@ -177,6 +252,26 @@ class TestConfig:
         # 检查 CORS 中间件是否配置
         middleware_types = [type(m).__name__ for m in app.user_middleware]
         assert 'CORSMiddleware' in middleware_types or len(middleware_types) > 0
+
+
+class TestCache:
+    """缓存系统测试"""
+    
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+    
+    def test_cache_stats(self, client):
+        """测试缓存统计"""
+        response = client.get("/api/cache/stats")
+        assert response.status_code == 200
+    
+    def test_cache_clear(self, client):
+        """测试清空缓存"""
+        response = client.post("/api/cache/clear")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "ok"
 
 
 if __name__ == "__main__":
