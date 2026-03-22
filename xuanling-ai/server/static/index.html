@@ -1370,29 +1370,68 @@ let currentEditingFile = null;
         }
         
         function editMemory(id) {
-            if (!id) return;
+            if (!id) {
+                alert('无效的记忆 ID');
+                return;
+            }
+            
+            // 获取当前记忆内容
+            const memoryItem = event.target.closest('.memory-item');
+            const currentTitle = memoryItem?.querySelector('.memory-title')?.textContent || '';
+            const currentContent = memoryItem?.querySelector('.memory-content')?.textContent || '';
+            
             // 点击询问是编辑还是删除
             const action = confirm('点击确定编辑，点击取消删除');
+            
             if (action) {
                 // 编辑
-                const newTitle = prompt('新的记忆标题:');
-                const newContent = prompt('新的记忆内容:');
+                const newTitle = prompt('新的记忆标题:', currentTitle);
                 if (!newTitle) return;
-                // 删除旧的添加新的
+                
+                const newContent = prompt('新的记忆内容:', currentContent);
+                const tagsInput = prompt('标签 (逗号分隔):');
+                const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(Boolean) : [];
+                
+                // 先删除再添加新记忆
                 fetch(API_BASE + '/memory/' + id, { method: 'DELETE' })
-                    .then(() => fetch(API_BASE + '/memory', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({title: newTitle, content: newContent || '', tags: []})
-                    }))
-                    .then(() => loadMemories())
-                    .catch(e => alert('编辑失败: ' + e.message));
+                    .then(resp => resp.json())
+                    .then(() => {
+                        return fetch(API_BASE + '/memory', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                title: newTitle,
+                                content: newContent || '',
+                                tags: tags
+                            })
+                        });
+                    })
+                    .then(resp => resp.json())
+                    .then(data => {
+                        loadMemories();
+                        if (data.status === 'ok') {
+                            alert('✅ 记忆已更新');
+                        } else {
+                            alert('⚠️ 更新完成，但可能有错误');
+                        }
+                    })
+                    .catch(e => {
+                        console.error('编辑失败:', e);
+                        alert('编辑失败: ' + e.message);
+                    });
             } else {
                 // 删除
                 if (!confirm('确定要删除这条记忆吗？')) return;
                 fetch(API_BASE + '/memory/' + id, { method: 'DELETE' })
-                    .then(() => loadMemories())
-                    .catch(e => alert('删除失败: ' + e.message));
+                    .then(resp => resp.json())
+                    .then(data => {
+                        loadMemories();
+                        alert('✅ 记忆已删除');
+                    })
+                    .catch(e => {
+                        console.error('删除失败:', e);
+                        alert('删除失败: ' + e.message);
+                    });
             }
         }
         
