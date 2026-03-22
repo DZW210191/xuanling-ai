@@ -975,6 +975,30 @@ def api_create_memory_compat(memory: MemoryRequest):
     
     return {"status": "ok", "memory": new_memory}
 
+@app.put("/memory/{memory_id}")
+def api_update_memory_compat(memory_id: str, memory: MemoryRequest):
+    """更新记忆 (前端兼容)"""
+    with data_lock:
+        found = False
+        updated_memory = None
+        for i, m in enumerate(_data.get("memories", [])):
+            if str(m.get("id")) == str(memory_id):
+                _data["memories"][i]["title"] = memory.title
+                _data["memories"][i]["content"] = memory.content
+                _data["memories"][i]["tags"] = memory.tags or []
+                _data["memories"][i]["importance"] = memory.importance
+                _data["memories"][i]["updated_at"] = datetime.now().isoformat()
+                found = True
+                updated_memory = _data["memories"][i]
+                break
+        
+        if not found:
+            raise HTTPException(status_code=404, detail="记忆不存在")
+        
+        save_data(_data)
+    
+    return {"status": "ok", "message": "记忆已更新", "memory": updated_memory}
+
 @app.delete("/memory/{memory_id}")
 def api_delete_memory_compat(memory_id: str):
     """删除记忆 (前端兼容)"""

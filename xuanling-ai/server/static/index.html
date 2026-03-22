@@ -1392,33 +1392,30 @@ let currentEditingFile = null;
                 const tagsInput = prompt('标签 (逗号分隔):');
                 const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(Boolean) : [];
                 
-                // 先删除再添加新记忆
-                fetch(API_BASE + '/memory/' + id, { method: 'DELETE' })
-                    .then(resp => resp.json())
-                    .then(() => {
-                        return fetch(API_BASE + '/memory', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({
-                                title: newTitle,
-                                content: newContent || '',
-                                tags: tags
-                            })
-                        });
+                // 使用 PUT 更新
+                fetch(API_BASE + '/memory/' + id, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        title: newTitle,
+                        content: newContent || '',
+                        tags: tags,
+                        importance: 1
                     })
-                    .then(resp => resp.json())
-                    .then(data => {
+                })
+                .then(resp => resp.json())
+                .then(data => {
+                    if (data.status === 'ok') {
                         loadMemories();
-                        if (data.status === 'ok') {
-                            alert('✅ 记忆已更新');
-                        } else {
-                            alert('⚠️ 更新完成，但可能有错误');
-                        }
-                    })
-                    .catch(e => {
-                        console.error('编辑失败:', e);
-                        alert('编辑失败: ' + e.message);
-                    });
+                        alert('✅ 记忆已更新');
+                    } else {
+                        throw new Error(data.detail || '更新失败');
+                    }
+                })
+                .catch(e => {
+                    console.error('编辑失败:', e);
+                    alert('编辑失败: ' + e.message);
+                });
             } else {
                 // 删除
                 if (!confirm('确定要删除这条记忆吗？')) return;
