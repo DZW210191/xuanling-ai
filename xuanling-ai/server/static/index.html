@@ -24,7 +24,7 @@
         
         .main { flex: 1; display: flex; flex-direction: column; padding: 20px; overflow: hidden; }
         
-        .panel { display: none; height: 100%; }
+        .panel { display: none; height: 100%; overflow-y: auto; }
         .panel.active { display: flex; flex-direction: column; }
         
         .panel-title { font-size: 20px; margin-bottom: 15px; color: #e2e8f0; }
@@ -101,6 +101,16 @@
         .skills-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
         .skill-card { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 18px; border: 1px solid rgba(102, 126, 234, 0.2); cursor: pointer; transition: all 0.3s; }
         .skill-card:hover { border-color: #667eea; transform: translateY(-3px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3); }
+        
+        /* 代理卡片 */
+        .agent-card { background: rgba(0,0,0,0.3); border-radius: 10px; padding: 18px; border: 1px solid rgba(102, 126, 234, 0.2); cursor: pointer; transition: all 0.3s; margin-bottom: 15px; }
+        .agent-card:hover { border-color: #667eea; }
+        .agent-name { font-weight: bold; color: #e2e8f0; margin-bottom: 6px; }
+        .agent-desc { color: #a0aec0; font-size: 12px; }
+        .agent-status { margin-top: 8px; padding: 3px 10px; border-radius: 12px; font-size: 11px; display: inline-block; }
+        .agent-status.idle { background: rgba(160, 174, 192, 0.2); color: #a0aec0; }
+        .agent-status.running { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+        .agent-status.paused { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
         .skill-name { font-weight: bold; margin-bottom: 6px; font-size: 14px; }
         .skill-desc { color: #a0aec0; font-size: 12px; }
         
@@ -138,7 +148,14 @@
             /* 隐藏侧边栏，使用底部导航 */
             .sidebar { display: none !important; }
             .container { flex-direction: column; }
-            .main { padding: 10px; padding-bottom: 70px; }
+            .main { padding: 10px; padding-bottom: 70px; overflow-y: auto !important; overflow-x: hidden !important; }
+            
+            /* 面板滚动修复 */
+            .panel { overflow-y: auto !important; overflow-x: hidden !important; -webkit-overflow-scrolling: touch; }
+            .panel.active { flex: 1; min-height: 0; }
+            
+            /* 设置面板滚动 */
+            .settings-form { max-width: 100%; padding-bottom: 20px; }
             
             /* 底部导航栏 */
             .mobile-nav {
@@ -204,7 +221,7 @@
             button { min-height: 44px; min-width: 44px; }
             
             /* 模态框优化 */
-            .modal-content { width: 95% !important; margin: 10px auto; padding: 15px; }
+            .modal-content { width: 95% !important; margin: 10px auto; padding: 15px; max-height: 80vh; overflow-y: auto; }
             
             /* 表格优化 */
             table { font-size: 12px; }
@@ -217,6 +234,17 @@
             
             /* 隐藏桌面端特定元素 */
             .history-panel { display: none !important; }
+            
+            /* 表单组优化 */
+            .form-group { margin-bottom: 12px; }
+            .form-label { font-size: 13px; margin-bottom: 6px; }
+            .form-input { padding: 10px 12px; font-size: 16px !important; }
+            
+            /* 代理卡片优化 */
+            .agent-card { padding: 12px; margin-bottom: 10px; }
+            
+            /* 技能卡片优化 */
+            .skill-card { padding: 12px; }
         }
         
         /* 平板适配 */
