@@ -507,9 +507,10 @@
                     <!-- 添加自定义模型 -->
                     <div style="margin-top:25px;padding-top:20px;border-top:1px solid rgba(102,126,234,0.2);">
                         <div style="color:#667eea;font-weight:bold;margin-bottom:15px;">➕ 添加自定义模型</div>
-                        <div class="form-group"><label class="form-label">模型名称</label><input type="text" class="form-input" id="customModelName" placeholder="自定义模型名"></div>
+                        <div class="form-group"><label class="form-label">模型名称</label><input type="text" class="form-input" id="customModelName" placeholder="如: GPT-4、Claude-3"></div>
                         <div class="form-group"><label class="form-label">API 地址</label><input type="text" class="form-input" id="customApiUrl" placeholder="https://api.example.com/v1"></div>
-                        <div class="form-group"><label class="form-label">模型 ID</label><input type="text" class="form-input" id="customModelId" placeholder="如: gpt-4, claude-3..."></div>
+                        <div class="form-group"><label class="form-label">API Key</label><input type="password" class="form-input" id="customApiKey" placeholder="sk-xxx... 或你的 API Key"></div>
+                        <div class="form-group"><label class="form-label">模型 ID</label><input type="text" class="form-input" id="customModelId" placeholder="如: gpt-4, claude-3-opus"></div>
                         <button class="save-btn" style="background:rgba(102,126,234,0.3);" onclick="addCustomModel()">➕ 添加模型</button>
                     </div>
                 </div>
@@ -1403,13 +1404,19 @@ let currentEditingFile = null;
                 // 获取模型列表
                 const modelsResp = await fetch(API_BASE + '/models');
                 const modelsData = await modelsResp.json();
-                availableModels = modelsData.models || [];
+                let models = modelsData.models || [];
                 const current = modelsData.current || {};
+                
+                // 加载本地存储的自定义模型
+                const customModels = JSON.parse(localStorage.getItem('customModels') || '[]');
+                models = [...models, ...customModels];
+                availableModels = models;
                 
                 // 填充模型选择下拉框
                 const select = document.getElementById('modelSelect');
-                select.innerHTML = availableModels.map(m => 
-                    `<option value="${m.id}" ${m.is_active ? 'selected' : ''}>${m.name}</option>`
+                select.innerHTML = '<option value="">-- 选择模型 --</option>' + 
+                    models.map(m => 
+                    `<option value="${m.id}" ${m.is_active ? 'selected' : ''}>${m.name}${m.id.startsWith('custom_') ? ' (自定义)' : ''}</option>`
                 ).join('');
                 
                 // 显示当前模型信息
@@ -1434,8 +1441,12 @@ let currentEditingFile = null;
             const modelId = select.value;
             const model = availableModels.find(m => m.id === modelId);
             if (model) {
-                document.getElementById('apiUrl').value = model.url || '';
+                document.getElementById('apiUrl').value = model.url || model.api_url || '';
                 document.getElementById('modelName').value = model.model || '';
+                // 如果有保存的 API Key，也填充
+                if (model.apiKey) {
+                    document.getElementById('apiKey').value = model.apiKey;
+                }
             }
         }
         
@@ -1487,25 +1498,51 @@ let currentEditingFile = null;
         async function addCustomModel() {
             const name = document.getElementById('customModelName').value;
             const url = document.getElementById('customApiUrl').value;
+            const apiKey = document.getElementById('customApiKey').value;
             const model = document.getElementById('customModelId').value;
             
             if (!name || !url || !model) {
-                alert('请填写所有字段');
+                alert('请填写模型名称、API 地址和模型 ID');
                 return;
             }
             
+            // 生成唯一 ID
+            const modelId = 'custom_' + Date.now();
+            
+            // 保存到本地存储
+            const customModels = JSON.parse(localStorage.getItem('customModels') || '[]');
+            customModels.push({
+                id: modelId,
+                name: name,
+                url: url,
+                apiKey: apiKey,
+                model: model,
+                is_active: false
+            });
+            localStorage.setItem('customModels', JSON.stringify(customModels));
+            
+            // 同时保存到后端配置
             try {
-                await fetch(API_BASE + '/models', {
+                await fetch(API_BASE + '/api/settings', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name, url, model})
+                    body: JSON.stringify({
+                        model: model,
+                        apiUrl: url,
+                        apiKey: apiKey
+                    })
                 });
+                
                 alert('✅ 自定义模型添加成功！');
+                
                 // 清空输入
                 document.getElementById('customModelName').value = '';
                 document.getElementById('customApiUrl').value = '';
+                document.getElementById('customApiKey').value = '';
                 document.getElementById('customModelId').value = '';
-                loadSettings(); // 刷新
+                
+                // 刷新模型列表
+                loadSettings();
             } catch (e) {
                 alert('❌ 添加失败: ' + e.message);
             }
