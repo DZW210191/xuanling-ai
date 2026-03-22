@@ -133,6 +133,133 @@
         
         .loading { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: #fff; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        /* ========== 移动端适配 ========== */
+        @media screen and (max-width: 768px) {
+            /* 隐藏侧边栏，使用底部导航 */
+            .sidebar { display: none !important; }
+            .container { flex-direction: column; }
+            .main { padding: 10px; padding-bottom: 70px; }
+            
+            /* 底部导航栏 */
+            .mobile-nav {
+                display: flex !important;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: rgba(0,0,0,0.95);
+                backdrop-filter: blur(10px);
+                padding: 8px 0;
+                border-top: 1px solid rgba(102, 126, 234, 0.3);
+                z-index: 1000;
+                justify-content: space-around;
+            }
+            .mobile-nav-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 8px 12px;
+                color: #a0aec0;
+                font-size: 10px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .mobile-nav-item.active { color: #667eea; }
+            .mobile-nav-item span:first-child { font-size: 20px; margin-bottom: 4px; }
+            
+            /* 头部优化 */
+            .header { padding: 10px 15px; }
+            .logo { font-size: 18px; }
+            .header-right { gap: 10px; }
+            .status { display: none; }
+            
+            /* 对话界面优化 */
+            .chat-container { border-radius: 12px; }
+            .chat-header { padding: 10px 12px; }
+            .chat-title { font-size: 14px; }
+            .chat-actions { display: none; }
+            .chat-messages { padding: 12px; }
+            .message { max-width: 90%; }
+            .message-content { padding: 10px 14px; font-size: 13px; }
+            .chat-input { padding: 10px 12px; gap: 8px; }
+            .chat-input input { padding: 10px 14px; font-size: 16px; }
+            .chat-input button { padding: 10px 18px; font-size: 14px; }
+            
+            /* 项目卡片优化 */
+            .projects-grid { grid-template-columns: 1fr; gap: 10px; }
+            .project-card { padding: 15px; }
+            .project-icon { font-size: 28px; margin-bottom: 8px; }
+            .project-name { font-size: 14px; }
+            .project-desc { font-size: 12px; }
+            
+            /* 面板标题优化 */
+            .panel-title { font-size: 16px; margin-bottom: 10px; }
+            
+            /* 记忆卡片优化 */
+            .memory-item { padding: 12px; }
+            .memory-title { font-size: 13px; }
+            .memory-content { font-size: 12px; }
+            
+            /* 按钮优化 */
+            button { min-height: 44px; min-width: 44px; }
+            
+            /* 模态框优化 */
+            .modal-content { width: 95% !important; margin: 10px auto; padding: 15px; }
+            
+            /* 表格优化 */
+            table { font-size: 12px; }
+            
+            /* 项目详情 */
+            .project-detail-panel { padding: 10px; }
+            
+            /* 输入框优化 */
+            input, textarea, select { font-size: 16px !important; }
+            
+            /* 隐藏桌面端特定元素 */
+            .history-panel { display: none !important; }
+        }
+        
+        /* 平板适配 */
+        @media screen and (min-width: 769px) and (max-width: 1024px) {
+            .sidebar { width: 180px; }
+            .projects-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        
+        /* 大屏优化 */
+        @media screen and (min-width: 1400px) {
+            .projects-grid { grid-template-columns: repeat(4, 1fr); }
+            .container { max-width: 1600px; margin: 0 auto; }
+        }
+        
+        /* 触摸友好样式 */
+        button, input, select, textarea {
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* 平滑滚动 */
+        * {
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* 防止文本选择 */
+        .nav-item, .mobile-nav-item, .project-card, .memory-item {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        /* 安全区域适配 (iPhone X+) */
+        @supports (padding-bottom: env(safe-area-inset-bottom)) {
+            .mobile-nav {
+                padding-bottom: calc(8px + env(safe-area-inset-bottom));
+            }
+            .main {
+                padding-bottom: calc(70px + env(safe-area-inset-bottom));
+            }
+        }
+
+        /* 底部导航栏 - 默认隐藏 */
+        .mobile-nav { display: none; }
+
     </style>
 </head>
 <body>
@@ -539,6 +666,15 @@
             if (nav) nav.classList.add('active');
             var panel = document.getElementById(panelId);
             if (panel) panel.classList.add('active');
+            
+            // 更新移动端导航状态
+            document.querySelectorAll('.mobile-nav-item').forEach(function(item){
+                item.classList.remove('active');
+                if(item.getAttribute('onclick').includes(panelId)){
+                    item.classList.add('active');
+                }
+            });
+            
             if (panelId === 'projects') loadProjects();
             if (panelId === 'agents') loadAgents();
             if (panelId === 'memory') loadMemories();
@@ -1878,5 +2014,57 @@ async function parseDocument(docId) {
 }
 
 </script>
+    <!-- 移动端底部导航 -->
+    <div class="mobile-nav">
+        <div class="mobile-nav-item active" onclick="mobileSwitchTo('chat')">
+            <span>💬</span>
+            <span>对话</span>
+        </div>
+        <div class="mobile-nav-item" onclick="mobileSwitchTo('projects')">
+            <span>📁</span>
+            <span>项目</span>
+        </div>
+        <div class="mobile-nav-item" onclick="mobileSwitchTo('memory')">
+            <span>🧠</span>
+            <span>记忆</span>
+        </div>
+        <div class="mobile-nav-item" onclick="mobileSwitchTo('agents')">
+            <span>🤖</span>
+            <span>代理</span>
+        </div>
+        <div class="mobile-nav-item" onclick="mobileSwitchTo('settings')">
+            <span>⚙️</span>
+            <span>设置</span>
+        </div>
+    </div>
+    
+    <script>
+    // 移动端导航切换
+    function mobileSwitchTo(panelId) {
+        // 更新导航状态
+        document.querySelectorAll(".mobile-nav-item").forEach(item => item.classList.remove("active"));
+        event.currentTarget.classList.add("active");
+        
+        // 切换面板
+        switchTo(panelId);
+    }
+    
+    // 检测移动端并自动切换
+    function checkMobile() {
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            // 移动端默认显示对话
+            const activeNav = document.querySelector(".mobile-nav-item.active");
+            if (!activeNav) {
+                document.querySelector(".mobile-nav-item").click();
+            }
+        }
+    }
+    
+    // 页面加载和窗口大小变化时检测
+    window.addEventListener("load", checkMobile);
+    window.addEventListener("resize", checkMobile);
+    </script>
+
 </body>
 </html>
