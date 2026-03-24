@@ -366,6 +366,10 @@ class TaskScheduler:
     
     async def submit(self, task: Task) -> str:
         """提交任务"""
+        # 确保调度器已启动
+        if self._task_queue is None:
+            await self.start()
+        
         async with self._lock:
             self._tasks[task.id] = task
         

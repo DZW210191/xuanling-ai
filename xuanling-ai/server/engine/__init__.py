@@ -26,11 +26,16 @@ DEFAULT_SYSTEM_PROMPT = """你是玄灵AI，一个智能助手。你可以使用
 - 命令执行：运行 Shell 命令
 - 网络请求：发送 HTTP 请求
 - 消息发送：发送消息到各平台
-- 网络搜索：搜索网络信息
+- 网络搜索：搜索网络信息（需要配置API Key）
+
+## 重要提示
+- 如果工具调用失败或不可用，请直接用你的知识回复用户，不要卡住
+- 如果用户请求需要实时信息但你无法搜索，请诚实地告诉用户，并提供基于你知识的一般性回答
+- 始终保持回复有帮助，即使工具不可用
 
 ## 工作方式
 1. 理解用户需求
-2. 选择合适的工具
+2. 选择合适的工具（如果可用）
 3. 执行操作并返回结果
 4. 用自然语言解释你的操作
 
@@ -71,9 +76,13 @@ class AIEngine:
     
     async def _call_llm(self, messages: List[Dict], tools: List[Dict] = None) -> Dict:
         """调用 LLM API"""
+        # 检查 API Key
         if not self.api_key or self.api_key == "test-key":
-            # 无 API Key，使用模拟模式
-            return await self._mock_llm_call(messages, tools)
+            return {
+                "type": "error",
+                "content": "⚠️ API Key 未配置，请在系统设置中配置 API Key 后重试。",
+                "error": "API_KEY_NOT_CONFIGURED"
+            }
         
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -156,62 +165,6 @@ class AIEngine:
         
         return {"type": "text", "content": str(data)}
     
-    async def _mock_llm_call(self, messages: List[Dict], tools: List[Dict] = None) -> Dict:
-        """模拟 LLM 调用（无 API Key 时）"""
-        last_message = messages[-1]["content"].lower() if messages else ""
-        
-        # 模拟工具调用
-        if "读取" in last_message or "查看" in last_message:
-            if "文件" in last_message or any(ext in last_message for ext in [".txt", ".py", ".md", ".json"]):
-                # 提取文件路径
-                path_match = re.search(r'[\'"]?(/[^\s\'"]+\.\w+)[\'"]?', last_message)
-                if path_match:
-                    return {
-                        "type": "tool_calls",
-                        "tool_calls": [{
-                            "id": "call_1",
-                            "type": "function",
-                            "function": {
-                                "name": "read_file",
-                                "arguments": json.dumps({"path": path_match.group(1)})
-                            }
-                        }]
-                    }
-        
-        if "列出" in last_message and "目录" in last_message:
-            path_match = re.search(r'[\'"]?(/[^\s\'"]+)[\'"]?', last_message)
-            path = path_match.group(1) if path_match else "."
-            return {
-                "type": "tool_calls",
-                "tool_calls": [{
-                    "id": "call_1",
-                    "type": "function",
-                    "function": {
-                        "name": "list_directory",
-                        "arguments": json.dumps({"path": path})
-                    }
-                }]
-            }
-        
-        if "执行" in last_message or "运行" in last_message:
-            return {
-                "type": "tool_calls",
-                "tool_calls": [{
-                    "id": "call_1",
-                    "type": "function",
-                    "function": {
-                        "name": "exec_command",
-                        "arguments": json.dumps({"command": last_message.split("执行")[-1].split("运行")[-1].strip()})
-                    }
-                }]
-            }
-        
-        # 普通对话
-        return {
-            "type": "text",
-            "content": f"我理解你说的是: {messages[-1]['content']}\n\n如果你需要我执行操作，请明确告诉我，比如:\n- 读取 /path/to/file 文件\n- 列出 /path/to/directory 目录\n- 执行命令: ls -la"
-        }
-    
     async def _execute_tool_call(self, tool_call: Dict) -> Dict:
         """执行工具调用"""
         try:
@@ -238,6 +191,38 @@ class AIEngine:
                 "error": str(e)
             }
     
+    def _clean_messages_for_api(self, messages: List[Dict]) -> List[Dict]:
+        """清理消息列表，移除不完整的工具调用"""
+        cleaned = []
+        pending_tool_calls = {}  # tool_call_id -> tool_call
+        
+        for msg in messages:
+            role = msg.get("role")
+            
+            # 如果是 assistant 且有 tool_calls，记录待响应的调用
+            if role == "assistant" and "tool_calls" in msg:
+                for tc in msg.get("tool_calls", []):
+                    pending_tool_calls[tc["id"]] = tc
+                cleaned.append(msg)
+            
+            # 如果是 tool 响应，从待处理列表中移除
+            elif role == "tool":
+                tc_id = msg.get("tool_call_id")
+                if tc_id in pending_tool_calls:
+                    del pending_tool_calls[tc_id]
+                cleaned.append(msg)
+            
+            else:
+                cleaned.append(msg)
+        
+        # 如果还有未响应的 tool_calls，移除最后的 assistant 消息
+        if pending_tool_calls:
+            # 从后向前移除不完整的工具调用
+            while cleaned and cleaned[-1].get("role") == "assistant" and "tool_calls" in cleaned[-1]:
+                cleaned.pop()
+        
+        return cleaned
+    
     async def chat(self, user_message: str, system_prompt: str = None, context: Dict = None) -> AsyncGenerator[Dict, None]:
         """
         对话主循环 - 支持工具调用
@@ -250,9 +235,11 @@ class AIEngine:
             {"role": "system", "content": system_prompt or DEFAULT_SYSTEM_PROMPT}
         ]
         
-        # 添加历史上下文
+        # 添加历史上下文（清理不完整的工具调用）
         if self.conversation_history:
-            messages.extend(self.conversation_history[-10:])  # 保留最近10条
+            history = self.conversation_history[-10:]
+            history = self._clean_messages_for_api(history)
+            messages.extend(history)
         
         # 添加用户消息
         messages.append({"role": "user", "content": user_message})
@@ -262,6 +249,8 @@ class AIEngine:
         
         # 工具调用循环
         tool_call_count = 0
+        final_assistant_content = None  # 记录最终的助手回复
+        all_tool_calls = []  # 记录所有工具调用
         
         while tool_call_count < self.max_tool_calls:
             # 调用 LLM
@@ -273,15 +262,16 @@ class AIEngine:
             
             if response["type"] == "text":
                 # 文本回复，结束循环
-                self.conversation_history.append({"role": "user", "content": user_message})
-                self.conversation_history.append({"role": "assistant", "content": response["content"]})
-                self._trim_history()  # 限制历史长度
+                final_assistant_content = response["content"]
                 yield {"type": "text", "content": response["content"]}
-                return
+                break
             
             if response["type"] == "tool_calls":
                 # 有工具调用
                 tool_calls = response["tool_calls"]
+                
+                # 记录所有工具调用
+                all_tool_calls.extend(tool_calls)
                 
                 # 发送工具调用事件
                 yield {
@@ -324,21 +314,52 @@ class AIEngine:
                 
                 # 发送继续处理事件
                 yield {"type": "processing", "message": "正在处理工具结果..."}
+                
+                # 如果达到最大调用次数，记录警告
+                if tool_call_count >= self.max_tool_calls:
+                    yield {
+                        "type": "warning",
+                        "content": f"已达到最大工具调用次数 ({self.max_tool_calls})，请简化您的请求。"
+                    }
         
-        # 达到最大调用次数
-        yield {
-            "type": "warning",
-            "content": f"已达到最大工具调用次数 ({self.max_tool_calls})，请简化您的请求。"
-        }
+        # 统一更新历史记录
+        # 只有在有最终回复时才更新历史（避免存储不完整的工具调用）
+        if final_assistant_content:
+            self.conversation_history.append({"role": "user", "content": user_message})
+            self.conversation_history.append({"role": "assistant", "content": final_assistant_content})
+            self._trim_history()
+        elif tool_call_count > 0 and all_tool_calls:
+            # 如果只有工具调用但没有最终回复，记录用户消息但不记录不完整的工具调用
+            # 这样下次对话可以从头开始
+            logger.warning("工具调用未完成，跳过历史记录更新")
     
     async def chat_simple(self, user_message: str) -> str:
         """简单对话接口 - 返回最终文本结果"""
         final_content = ""
+        has_error = False
+        error_msg = ""
+        
         async for event in self.chat(user_message):
             if event["type"] == "text":
                 final_content = event["content"]
             elif event["type"] == "error":
-                final_content = f"错误: {event['content']}"
+                has_error = True
+                error_msg = event.get("content", "未知错误")
+                final_content = f"错误: {error_msg}"
+            elif event["type"] == "tool_result":
+                # 检查工具是否失败
+                result = event.get("result", {})
+                if result.get("success") == False and result.get("error"):
+                    error_msg = result.get("error", "")
+                    logger.warning(f"工具调用失败: {error_msg}")
+        
+        # 如果没有收到最终回复但有错误，返回错误信息
+        if not final_content and has_error:
+            return f"抱歉，处理请求时遇到问题: {error_msg}"
+        
+        # 如果完全没有回复
+        if not final_content:
+            return "抱歉，未收到有效回复。请稍后重试或简化您的请求。"
         
         return final_content
 

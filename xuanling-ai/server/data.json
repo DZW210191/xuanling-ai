@@ -1,61 +1,6 @@
 {
-  "projects": [
-    {
-      "id": 1,
-      "name": "AI 智能代理框架",
-      "description": "基于 OpenClaw 构建",
-      "icon": "🤖",
-      "status": "进行中",
-      "progress": 65,
-      "tasks": 12,
-      "memory": 5
-    },
-    {
-      "id": 2,
-      "name": "Web 控制台",
-      "description": "玄灵AI 管理界面",
-      "icon": "🌐",
-      "status": "进行中",
-      "progress": 80,
-      "tasks": 8,
-      "memory": 3
-    },
-    {
-      "id": 3,
-      "name": "test-proj",
-      "description": "已更新",
-      "icon": "📁",
-      "status": "维护中",
-      "progress": 0,
-      "tasks": 0,
-      "memory": 0,
-      "created_at": "2026-03-20T21:26:45.616668",
-      "updated_at": "2026-03-20T21:26:45.632298"
-    },
-    {
-      "id": 5,
-      "name": "TestProjE2E",
-      "description": "",
-      "icon": "📁",
-      "status": "进行中",
-      "progress": 42,
-      "tasks": 0,
-      "memory": 0,
-      "created_at": "2026-03-20T22:07:20.082968",
-      "updated_at": "2026-03-20T22:07:43.619116"
-    }
-  ],
+  "projects": [],
   "memories": [
-    {
-      "id": 1,
-      "title": "主人称呼偏好",
-      "content": "喜欢被称呼为老板",
-      "tags": [
-        "个人"
-      ],
-      "importance": 5,
-      "project_id": null
-    },
     {
       "id": 3,
       "title": "AI 项目",
@@ -65,41 +10,1130 @@
       ],
       "importance": 5,
       "project_id": null
+    },
+    {
+      "id": 7,
+      "title": "测试",
+      "content": "测试内容",
+      "tags": [],
+      "project_id": null,
+      "importance": 1,
+      "created_at": "2026-03-22T12:33:27.956557"
+    },
+    {
+      "id": 8,
+      "title": "更新后的标题",
+      "content": "这是更新后的内容",
+      "tags": [
+        "updated",
+        "test"
+      ],
+      "project_id": null,
+      "importance": 3,
+      "created_at": "2026-03-22T14:13:42.901361",
+      "updated_at": "2026-03-22T14:20:30.208218"
+    },
+    {
+      "id": 9,
+      "title": "测试记忆",
+      "content": "这是测试内容",
+      "tags": [
+        "test"
+      ],
+      "project_id": null,
+      "importance": 1,
+      "created_at": "2026-03-22T15:28:36.827945"
+    },
+    {
+      "id": 10,
+      "title": "测试记忆",
+      "content": "这是测试内容",
+      "tags": [
+        "test"
+      ],
+      "project_id": null,
+      "importance": 1,
+      "created_at": "2026-03-22T15:56:23.014873"
+    },
+    {
+      "id": 11,
+      "title": "测试记忆",
+      "content": "这是测试内容",
+      "tags": [
+        "test"
+      ],
+      "project_id": null,
+      "importance": 1,
+      "created_at": "2026-03-22T16:05:41.286385"
+    },
+    {
+      "id": 12,
+      "title": "测试记忆",
+      "content": "这是测试内容",
+      "tags": [
+        "test"
+      ],
+      "project_id": null,
+      "importance": 1,
+      "created_at": "2026-03-22T16:48:06.090630"
+    },
+    {
+      "id": 13,
+      "title": "测试记忆",
+      "content": "这是测试内容",
+      "tags": [],
+      "project_id": null,
+      "importance": 1,
+      "created_at": "2026-03-22T16:55:41.819840",
+      "updated_at": "2026-03-23T18:37:16.825213"
+    },
+    {
+      "id": 14,
+      "title": "测试记忆",
+      "content": "这是测试内容",
+      "tags": [
+        "test"
+      ],
+      "project_id": null,
+      "importance": 1,
+      "created_at": "2026-03-22T16:56:39.225394"
+    },
+    {
+      "id": 15,
+      "title": "测试记忆",
+      "content": "这是测试内容",
+      "tags": [
+        "test"
+      ],
+      "project_id": null,
+      "importance": 1,
+      "created_at": "2026-03-22T17:16:53.623091"
+    },
+    {
+      "id": 16,
+      "title": "测试记忆",
+      "content": "这是测试内容",
+      "tags": [
+        "test"
+      ],
+      "project_id": null,
+      "importance": 1,
+      "created_at": "2026-03-22T17:25:24.594227"
     }
   ],
   "next_ids": {
     "project": 7,
-    "memory": 7,
-    "agent": 5,
-    "agent_memory": 1
+    "memory": 18,
+    "agent": 4,
+    "agent_memory": 2,
+    "conversation": 3,
+    "agent_task": 1
   },
   "agents": [
     {
-      "id": 1,
+      "id": "1",
       "name": "代码审查代理",
-      "status": "running",
-      "tasks_count": 12,
-      "success_rate": 0.92,
-      "description": "自动审查代码"
+      "description": "自动审查代码",
+      "role": "worker",
+      "status": "stopped",
+      "icon": "🤖",
+      "skills": [],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955846",
+      "updated_at": "2026-03-23T20:30:52.955862",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
     },
     {
-      "id": 2,
+      "id": "2",
       "name": "文档助手",
+      "description": "生成文档",
+      "role": "worker",
       "status": "running",
-      "tasks_count": 8,
-      "success_rate": 1.0,
-      "description": "生成文档"
+      "icon": "🤖",
+      "skills": [],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955881",
+      "updated_at": "2026-03-23T20:31:55.909003",
+      "stats": {
+        "total_tasks": 2,
+        "completed_tasks": 2,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
     },
     {
-      "id": 3,
+      "id": "3",
       "name": "网页抓取代理",
+      "description": "抓取网页",
+      "role": "worker",
       "status": "idle",
-      "tasks_count": 5,
-      "success_rate": 1.0,
-      "description": "抓取网页"
+      "icon": "🤖",
+      "skills": [],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955894",
+      "updated_at": "2026-03-23T20:30:52.955896",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "12e085b1",
+      "name": "💻 编程助手",
+      "description": "编写、修改、调试代码",
+      "role": "coder",
+      "status": "running",
+      "icon": "💻",
+      "skills": [
+        "code_gen",
+        "debug",
+        "refactor"
+      ],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955905",
+      "updated_at": "2026-03-23T20:30:52.955906",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "b97c5b32",
+      "name": "🔬 研究员",
+      "description": "搜索资料、分析信息",
+      "role": "researcher",
+      "status": "idle",
+      "icon": "🔬",
+      "skills": [
+        "web_search",
+        "data_analysis"
+      ],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955915",
+      "updated_at": "2026-03-23T20:30:52.955917",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "ded2cf23",
+      "name": "📝 测试代理",
+      "description": "执行具体任务，如文件操作、数据处理",
+      "role": "worker",
+      "status": "idle",
+      "icon": "⚙️",
+      "skills": [
+        "file_ops",
+        "data_process"
+      ],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955925",
+      "updated_at": "2026-03-23T20:30:52.955927",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "d6bc6090",
+      "name": "🧪 测试执行代理",
+      "description": "执行具体任务，如文件操作、数据处理",
+      "role": "worker",
+      "status": "running",
+      "icon": "⚙️",
+      "skills": [
+        "file_ops",
+        "data_process"
+      ],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955935",
+      "updated_at": "2026-03-23T20:30:52.955937",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "cf0c52d5",
+      "name": "验证测试",
+      "description": "",
+      "role": "worker",
+      "status": "idle",
+      "icon": "🤖",
+      "skills": [],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955945",
+      "updated_at": "2026-03-23T20:30:52.955946",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "b1732c6c",
+      "name": "AI测试代理",
+      "description": "编写、修改、调试代码",
+      "role": "coder",
+      "status": "running",
+      "icon": "💻",
+      "skills": [
+        "code_gen",
+        "debug",
+        "refactor"
+      ],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955954",
+      "updated_at": "2026-03-23T20:30:52.955956",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "b052eb54",
+      "name": "AI分析师",
+      "description": "分析复杂目标，分解为可执行的子任务",
+      "role": "planner",
+      "status": "running",
+      "icon": "📋",
+      "skills": [
+        "task_planning",
+        "goal_analysis"
+      ],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955963",
+      "updated_at": "2026-03-23T20:30:52.955965",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "0fdf88c6",
+      "name": "智能分析师",
+      "description": "分析复杂目标，分解为可执行的子任务",
+      "role": "planner",
+      "status": "running",
+      "icon": "📋",
+      "skills": [
+        "task_planning",
+        "goal_analysis"
+      ],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.955972",
+      "updated_at": "2026-03-23T20:30:52.955974",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "be140a73",
+      "name": "代码专家",
+      "description": "编写、修改、调试代码",
+      "role": "coder",
+      "status": "running",
+      "icon": "💻",
+      "skills": [
+        "code_gen",
+        "debug",
+        "refactor"
+      ],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.956012",
+      "updated_at": "2026-03-23T20:30:52.956015",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "e4ff768a",
+      "name": "Python架构师",
+      "description": "专注于Python后端架构设计",
+      "role": "coder",
+      "status": "running",
+      "icon": "💻",
+      "skills": [
+        "FastAPI",
+        "Django",
+        "PostgreSQL",
+        "Redis"
+      ],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.956024",
+      "updated_at": "2026-03-23T20:30:52.956026",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
+    },
+    {
+      "id": "4b5765fc",
+      "name": "测试代理2",
+      "description": "这是一个测试",
+      "role": "worker",
+      "status": "idle",
+      "icon": "🤖",
+      "skills": [],
+      "max_concurrent_tasks": 3,
+      "system_prompt": "",
+      "model": "MiniMax-M2.5",
+      "created_at": "2026-03-23T20:30:52.956033",
+      "updated_at": "2026-03-23T20:30:52.956035",
+      "stats": {
+        "total_tasks": 0,
+        "completed_tasks": 0,
+        "failed_tasks": 0,
+        "success_rate": 100.0
+      },
+      "current_tasks": [],
+      "auto_start": true,
+      "timeout": 300
     }
   ],
-  "agent_memories": {},
+  "agent_memories": {
+    "e4ff768a": {
+      "1": {
+        "id": 1,
+        "title": "项目偏好",
+        "content": "用户偏好使用FastAPI和PostgreSQL技术栈",
+        "created_at": "2026-03-23T19:48:16.604012"
+      }
+    }
+  },
   "agent_tasks": {},
-  "channels": []
+  "channels": [],
+  "conversations": {
+    "2": {
+      "id": 2,
+      "title": "写一篇 今日最新的ai圈 的文章",
+      "messages": [
+        {
+          "role": "user",
+          "content": "写一篇 今日最新的ai圈 的文章",
+          "timestamp": "2026-03-23T20:59:56.206104"
+        },
+        {
+          "role": "assistant",
+          "content": "我理解你说的是: 写一篇 今日最新的ai圈 的文章\n\n如果你需要我执行操作，请明确告诉我，比如:\n- 读取 /path/to/file 文件\n- 列出 /path/to/directory 目录\n- 执行命令: ls -la",
+          "timestamp": "2026-03-23T20:59:56.277422"
+        },
+        {
+          "role": "user",
+          "content": "写一篇 今日最新的ai圈 的文章",
+          "timestamp": "2026-03-23T21:26:38.666115"
+        },
+        {
+          "role": "assistant",
+          "content": "⚠️ 未收到回复，请检查 API 配置",
+          "timestamp": "2026-03-23T21:27:14.108948"
+        },
+        {
+          "role": "user",
+          "content": "写一篇 今日最新的ai圈 的文章",
+          "timestamp": "2026-03-23T21:37:26.219634"
+        },
+        {
+          "role": "assistant",
+          "content": "⚠️ 未收到回复，请检查 API 配置",
+          "timestamp": "2026-03-23T21:38:09.139802"
+        },
+        {
+          "role": "user",
+          "content": "写一篇 今日最新的ai圈 的文章",
+          "timestamp": "2026-03-23T21:56:39.731564"
+        },
+        {
+          "role": "assistant",
+          "content": "⚠️ 未收到回复，请检查 API 配置",
+          "timestamp": "2026-03-23T21:57:17.223366"
+        },
+        {
+          "role": "user",
+          "content": "你好",
+          "timestamp": "2026-03-23T22:00:16.031866"
+        },
+        {
+          "role": "assistant",
+          "content": "你好！需要我帮你做什么？可以查资料、写作润色、代码调试、数据处理，或执行命令、读写文件、发起网络请求、发送消息等。直接告诉我你的目标或材料即可开始。",
+          "timestamp": "2026-03-23T22:00:21.536148"
+        },
+        {
+          "role": "user",
+          "content": "写一篇 今日最新的ai圈 的文章",
+          "timestamp": "2026-03-23T22:00:31.382537"
+        },
+        {
+          "role": "assistant",
+          "content": "⚠️ 未收到回复，请检查 API 配置",
+          "timestamp": "2026-03-23T22:01:26.182624"
+        },
+        {
+          "role": "user",
+          "content": "写一篇 今日最新的ai圈 的文章",
+          "timestamp": "2026-03-23T22:07:22.195127"
+        },
+        {
+          "role": "assistant",
+          "content": "⚠️ 未收到有效回复",
+          "timestamp": "2026-03-23T22:08:09.203941"
+        },
+        {
+          "role": "user",
+          "content": "写一篇 今日最新的ai圈 的文章",
+          "timestamp": "2026-03-23T22:14:29.426236"
+        },
+        {
+          "role": "assistant",
+          "content": "未收到回复",
+          "timestamp": "2026-03-23T22:15:13.216655"
+        },
+        {
+          "role": "user",
+          "content": "写一篇 今日最新的ai圈 的文章",
+          "timestamp": "2026-03-23T22:47:34.274015"
+        },
+        {
+          "role": "assistant",
+          "content": "未收到回复",
+          "timestamp": "2026-03-23T22:48:25.760582"
+        }
+      ],
+      "created_at": "2026-03-23T20:59:56.093101",
+      "updated_at": "2026-03-23T22:48:25.760582"
+    }
+  },
+  "agent_tasks_data": [
+    {
+      "id": "a19357b1",
+      "title": "优化登录页面",
+      "description": "优化登录页面的用户体验",
+      "goal": "",
+      "status": "running",
+      "priority": 10,
+      "assigned_agent": "12e085b1",
+      "created_at": "2026-03-23T18:52:55.224788",
+      "started_at": null,
+      "completed_at": null,
+      "result": null,
+      "error": null,
+      "progress": 0.5,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "73e09663",
+      "title": "分析代码性能",
+      "description": "分析项目代码的性能瓶颈",
+      "goal": "",
+      "status": "completed",
+      "priority": 10,
+      "assigned_agent": "12e085b1",
+      "created_at": "2026-03-23T19:16:47.548726",
+      "started_at": null,
+      "completed_at": null,
+      "result": {
+        "summary": "任务 '分析代码性能' 执行完成",
+        "details": "代理 💻 编程助手 完成了 5 个步骤",
+        "artifacts": [],
+        "metrics": {
+          "duration_seconds": 2.5,
+          "steps_completed": 5
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "c97ece9e",
+      "title": "测试任务执行",
+      "description": "测试完整执行流程",
+      "goal": "",
+      "status": "completed",
+      "priority": 10,
+      "assigned_agent": "d6bc6090",
+      "created_at": "2026-03-23T19:20:53.905346",
+      "started_at": null,
+      "completed_at": null,
+      "result": {
+        "summary": "任务 '测试任务执行' 执行完成",
+        "details": "代理 🧪 测试执行代理 完成了 5 个步骤",
+        "artifacts": [],
+        "metrics": {
+          "duration_seconds": 2.5,
+          "steps_completed": 5
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "66f60084",
+      "title": "帮我写一个 Python Hello World",
+      "description": "编写一个简单的 Python 程序",
+      "goal": "",
+      "status": "completed",
+      "priority": 10,
+      "assigned_agent": "b1732c6c",
+      "created_at": "2026-03-23T19:28:44.179693",
+      "started_at": null,
+      "completed_at": null,
+      "result": {
+        "summary": "任务 '帮我写一个 Python Hello World' 已通过 AI 分析完成",
+        "ai_analysis": "{'type': 'tool_calls', 'tool_calls': [{'id': 'call_1', 'type': 'function', 'function': {'name': 'exec_command', 'arguments': '{\"command\": \"\\\\u601d\\\\u8def\\\\uff0c\\\\u5e76\\\\u7ed9\\\\u51fa\\\\u9884\\\\u671f\\\\u7ed3\\\\u679c\\\\u3002\"}'}}]}",
+        "agent_info": {
+          "name": "AI测试代理",
+          "role": "coder",
+          "skills": [
+            "code_gen",
+            "debug",
+            "refactor"
+          ]
+        },
+        "metrics": {
+          "duration_seconds": 0.61,
+          "ai_model": "MiniMax-M2.5"
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "f1841d6a",
+      "title": "分析项目架构",
+      "description": "分析玄灵AI项目的整体架构设计",
+      "goal": "",
+      "status": "completed",
+      "priority": 10,
+      "assigned_agent": "b052eb54",
+      "created_at": "2026-03-23T19:29:42.506607",
+      "started_at": null,
+      "completed_at": null,
+      "result": {
+        "summary": "任务 '分析项目架构' 已通过 AI 分析完成",
+        "ai_analysis": "[AI 决定执行 1 个工具调用]\n- exec_command: {\"command\": \"\\u601d\\u8def\\uff0c\\u5e76\\u7ed9\\u51fa\\u9884\\u671f\\u7ed3\\u679c\\u3002\"}\n",
+        "agent_info": {
+          "name": "AI分析师",
+          "role": "planner",
+          "skills": [
+            "task_planning",
+            "goal_analysis"
+          ]
+        },
+        "metrics": {
+          "duration_seconds": 0.61,
+          "ai_model": "MiniMax-M2.5"
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "ff8cbfbc",
+      "title": "设计用户登录功能",
+      "description": "为玄灵AI设计一个安全可靠的用户登录系统",
+      "goal": "",
+      "status": "completed",
+      "priority": 10,
+      "assigned_agent": "0fdf88c6",
+      "created_at": "2026-03-23T19:31:17.031149",
+      "started_at": null,
+      "completed_at": null,
+      "result": {
+        "summary": "任务 '设计用户登录功能' 已通过 AI 分析完成",
+        "ai_analysis": "{'type': 'tool_calls', 'tool_calls': [{'id': 'call_1', 'type': 'function', 'function': {'name': 'exec_command', 'arguments': '{\"command\": \"\\\\u601d\\\\u8def\\\\uff0c\\\\u5e76\\\\u7ed9\\\\u51fa\\\\u9884\\\\u671f\\\\u7ed3\\\\u679c\\\\u3002\"}'}}]}",
+        "agent_info": {
+          "name": "智能分析师",
+          "role": "planner",
+          "skills": [
+            "task_planning",
+            "goal_analysis"
+          ]
+        },
+        "metrics": {
+          "duration_seconds": 0.61,
+          "ai_model": "MiniMax-M2.5"
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "4119fcc2",
+      "title": "编写API接口",
+      "description": "为用户管理模块编写RESTful API",
+      "goal": "",
+      "status": "completed",
+      "priority": 10,
+      "assigned_agent": "be140a73",
+      "created_at": "2026-03-23T19:32:40.314035",
+      "started_at": null,
+      "completed_at": null,
+      "result": {
+        "summary": "任务 '编写API接口' 已通过 AI 分析完成",
+        "ai_analysis": "作为 代码专家，我已分析任务：编写API接口\n\n## 任务分析\n根据我的 coder 角色和技能（code_gen, debug, refactor），我对任务进行了分析。\n\n## 执行思路\n1. 首先，理解任务需求：为用户管理模块编写RESTful API\n2. 分析完成任务的所需资源和步骤\n3. 制定详细的执行计划\n4. 按计划执行并验证结果\n\n## 预期结果\n任务将被成功完成，产出符合要求的成果。\n",
+        "agent_info": {
+          "name": "代码专家",
+          "role": "coder",
+          "skills": [
+            "code_gen",
+            "debug",
+            "refactor"
+          ]
+        },
+        "metrics": {
+          "duration_seconds": 0.61,
+          "ai_model": "MiniMax-M2.5"
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "ba926566",
+      "title": "写一篇 今日最新的ai圈 的文章",
+      "description": "写一篇 今日最新的ai圈 的文章",
+      "goal": "写一篇 今日最新的ai圈 的文章",
+      "status": "completed",
+      "priority": 10,
+      "assigned_agent": "2",
+      "created_at": "2026-03-23T19:40:53.557380",
+      "started_at": null,
+      "completed_at": null,
+      "result": {
+        "summary": "任务 '写一篇 今日最新的ai圈 的文章' 已通过 AI 分析完成",
+        "ai_analysis": "作为 文档助手，我已分析任务：写一篇 今日最新的ai圈 的文章\n\n## 任务分析\n根据我的 worker 角色和技能（通用能力），我对任务进行了分析。\n\n## 执行思路\n1. 首先，理解任务需求：写一篇 今日最新的ai圈 的文章\n2. 分析完成任务的所需资源和步骤\n3. 制定详细的执行计划\n4. 按计划执行并验证结果\n\n## 预期结果\n任务将被成功完成，产出符合要求的成果。\n",
+        "agent_info": {
+          "name": "文档助手",
+          "role": "worker",
+          "skills": []
+        },
+        "metrics": {
+          "duration_seconds": 0.61,
+          "ai_model": "MiniMax-M2.5"
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "42b54f95",
+      "title": "设计用户认证系统",
+      "description": "设计一个安全的JWT认证系统",
+      "goal": "",
+      "status": "completed",
+      "priority": 10,
+      "assigned_agent": "e4ff768a",
+      "created_at": "2026-03-23T19:48:16.644491",
+      "started_at": null,
+      "completed_at": null,
+      "result": {
+        "summary": "任务 '设计用户认证系统' 已通过 AI 分析完成",
+        "ai_analysis": "作为 Python架构师，我已分析任务：设计用户认证系统\n\n## 任务分析\n根据我的 coder 角色和技能（FastAPI, Django, PostgreSQL, Redis），我对任务进行了分析。\n\n## 执行思路\n1. 首先，理解任务需求：设计一个安全的JWT认证系统\n2. 分析完成任务的所需资源和步骤\n3. 制定详细的执行计划\n4. 按计划执行并验证结果\n\n## 预期结果\n任务将被成功完成，产出符合要求的成果。\n",
+        "agent_info": {
+          "name": "Python架构师",
+          "role": "coder",
+          "skills": [
+            "FastAPI",
+            "Django",
+            "PostgreSQL",
+            "Redis"
+          ]
+        },
+        "metrics": {
+          "duration_seconds": 0.61,
+          "ai_model": "MiniMax-M2.5"
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "ff4ef591",
+      "title": "写一篇 今日最新的ai圈 的文章",
+      "description": "写一篇 今日最新的ai圈 的文章",
+      "goal": "写一篇 今日最新的ai圈 的文章",
+      "status": "completed",
+      "priority": 5,
+      "assigned_agent": "2",
+      "created_at": "2026-03-23T20:25:13.377455",
+      "started_at": null,
+      "completed_at": null,
+      "result": {
+        "summary": "任务 '写一篇 今日最新的ai圈 的文章' 已通过 AI 分析完成",
+        "ai_analysis": "作为 文档助手，我已分析任务：写一篇 今日最新的ai圈 的文章\n\n## 任务分析\n根据我的 worker 角色和技能（通用能力），我对任务进行了分析。\n\n## 执行思路\n1. 首先，理解任务需求：写一篇 今日最新的ai圈 的文章\n2. 分析完成任务的所需资源和步骤\n3. 制定详细的执行计划\n4. 按计划执行并验证结果\n\n## 预期结果\n任务将被成功完成，产出符合要求的成果。\n",
+        "agent_info": {
+          "name": "文档助手",
+          "role": "worker",
+          "skills": []
+        },
+        "metrics": {
+          "duration_seconds": 0.61,
+          "ai_model": "MiniMax-M2.5"
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "61074ba7",
+      "title": "读取 README 文件",
+      "description": "请读取 /root/.openclaw/workspace/xuanling-ai/README.md 文件的内容",
+      "goal": "获取文件内容并总结",
+      "status": "completed",
+      "priority": 5,
+      "assigned_agent": "2",
+      "created_at": "2026-03-23T20:31:55.932730",
+      "started_at": "2026-03-23T20:32:05.359925",
+      "completed_at": "2026-03-23T20:32:05.372478",
+      "result": {
+        "summary": "我理解你说的是: {\"success\": true, \"result\": {\"error\": \"文件不存在: /root/.openclaw/workspace/xuanling-ai/readme.md\", \"content\": null}, \"tool\": \"read_file\", \"timestamp\": \"2026-03-23T20:32:05.367749\"}\n\n如果你需要我执行操作，请明确告诉我，比如:\n- 读取 /path/to/file 文件\n- 列出 /path/to/directory 目录\n- 执行命令: ls -la",
+        "ai_response": "我理解你说的是: {\"success\": true, \"result\": {\"error\": \"文件不存在: /root/.openclaw/workspace/xuanling-ai/readme.md\", \"content\": null}, \"tool\": \"read_file\", \"timestamp\": \"2026-03-23T20:32:05.367749\"}\n\n如果你需要我执行操作，请明确告诉我，比如:\n- 读取 /path/to/file 文件\n- 列出 /path/to/directory 目录\n- 执行命令: ls -la",
+        "tools_used": [
+          "read_file"
+        ],
+        "tool_results": [
+          {
+            "tool": "read_file",
+            "success": true,
+            "result": {
+              "success": true,
+              "result": {
+                "error": "文件不存在: /root/.openclaw/workspace/xuanling-ai/readme.md",
+                "content": null
+              },
+              "tool": "read_file",
+              "timestamp": "2026-03-23T20:32:05.367749"
+            }
+          }
+        ],
+        "agent_info": {
+          "name": "文档助手",
+          "role": "worker",
+          "skills": []
+        },
+        "metrics": {
+          "duration_seconds": 0.01,
+          "tool_calls": 1,
+          "ai_model": "MiniMax-M2.5"
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    },
+    {
+      "id": "5324bb26",
+      "title": "列出目录",
+      "description": "请列出 /root/.openclaw/workspace/xuanling-ai/server 目录的内容",
+      "goal": "查看目录结构",
+      "status": "completed",
+      "priority": 5,
+      "assigned_agent": "2",
+      "created_at": "2026-03-23T20:32:20.565767",
+      "started_at": "2026-03-23T20:32:20.590794",
+      "completed_at": "2026-03-23T20:32:20.600030",
+      "result": {
+        "summary": "我理解你说的是: {\"success\": true, \"result\": {\"path\": \"/root/.openclaw/workspace/xuanling-ai/server\", \"items\": [{\"name\": \".pytest_cache\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-21T15:40:46.513701\"}, {\"name\": \"ARCHITECTURE.md\", \"type\": \"file\", \"size\": 9245, \"modified\": \"2026-03-22T10:53:41.694839\"}, {\"name\": \"__pycache__\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-23T20:30:52.564721\"}, {\"name\": \"agent_manager\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-23T18:51:24.412045\"}, {\"name\": \"appdata\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.695839\"}, {\"name\": \"cache.py\", \"type\": \"file\", \"size\": 7364, \"modified\": \"2026-03-22T10:53:41.695839\"}, {\"name\": \"data.json\", \"type\": \"file\", \"size\": 27081, \"modified\": \"2026-03-23T20:32:20.595157\"}, {\"name\": \"data_backup.json\", \"type\": \"file\", \"size\": 27081, \"modified\": \"2026-03-23T20:32:20.593157\"}, {\"name\": \"engine\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.696839\"}, {\"name\": \"main.py\", \"type\": \"file\", \"size\": 65798, \"modified\": \"2026-03-23T20:30:21.088566\"}, {\"name\": \"main.py.bak\", \"type\": \"file\", \"size\": 22275, \"modified\": \"2026-03-22T10:53:41.696839\"}, {\"name\": \"memory\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.709839\"}, {\"name\": \"project_manager\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.710839\"}, {\"name\": \"projects\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-23T18:30:47.441815\"}, {\"name\": \"pytest.ini\", \"type\": \"file\", \"size\": 403, \"modified\": \"2026-03-22T10:53:41.698839\"}, {\"name\": \"requirements.txt\", \"type\": \"file\", \"size\": 842, \"modified\": \"2026-03-23T20:17:31.473752\"}, {\"name\": \"security\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.699839\"}, {\"name\": \"settings.json\", \"type\": \"file\", \"size\": 57, \"modified\": \"2026-03-23T20:02:24.256242\"}, {\"name\": \"skills\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.699839\"}, {\"name\": \"static\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T14:42:35.983857\"}, {\"name\": \"subagents\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.701839\"}, {\"name\": \"test_server.py\", \"type\": \"file\", \"size\": 7889, \"modified\": \"2026-03-22T10:53:41.701839\"}, {\"name\": \"tests\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.703839\"}, {\"name\": \"tools\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.710839\"}, {\"name\": \"uploads\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-21T12:23:56.053485\"}], \"count\": 25}, \"tool\": \"list_directory\", \"timestamp\": \"2026-03-23T20:32:20.596797\"}\n\n如果你需要我执行操作，请明确告诉我，比如:\n- 读取 /path/to/file 文件\n- 列出 /path/to/directory 目录\n- 执行命令: ls -la",
+        "ai_response": "我理解你说的是: {\"success\": true, \"result\": {\"path\": \"/root/.openclaw/workspace/xuanling-ai/server\", \"items\": [{\"name\": \".pytest_cache\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-21T15:40:46.513701\"}, {\"name\": \"ARCHITECTURE.md\", \"type\": \"file\", \"size\": 9245, \"modified\": \"2026-03-22T10:53:41.694839\"}, {\"name\": \"__pycache__\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-23T20:30:52.564721\"}, {\"name\": \"agent_manager\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-23T18:51:24.412045\"}, {\"name\": \"appdata\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.695839\"}, {\"name\": \"cache.py\", \"type\": \"file\", \"size\": 7364, \"modified\": \"2026-03-22T10:53:41.695839\"}, {\"name\": \"data.json\", \"type\": \"file\", \"size\": 27081, \"modified\": \"2026-03-23T20:32:20.595157\"}, {\"name\": \"data_backup.json\", \"type\": \"file\", \"size\": 27081, \"modified\": \"2026-03-23T20:32:20.593157\"}, {\"name\": \"engine\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.696839\"}, {\"name\": \"main.py\", \"type\": \"file\", \"size\": 65798, \"modified\": \"2026-03-23T20:30:21.088566\"}, {\"name\": \"main.py.bak\", \"type\": \"file\", \"size\": 22275, \"modified\": \"2026-03-22T10:53:41.696839\"}, {\"name\": \"memory\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.709839\"}, {\"name\": \"project_manager\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.710839\"}, {\"name\": \"projects\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-23T18:30:47.441815\"}, {\"name\": \"pytest.ini\", \"type\": \"file\", \"size\": 403, \"modified\": \"2026-03-22T10:53:41.698839\"}, {\"name\": \"requirements.txt\", \"type\": \"file\", \"size\": 842, \"modified\": \"2026-03-23T20:17:31.473752\"}, {\"name\": \"security\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.699839\"}, {\"name\": \"settings.json\", \"type\": \"file\", \"size\": 57, \"modified\": \"2026-03-23T20:02:24.256242\"}, {\"name\": \"skills\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.699839\"}, {\"name\": \"static\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T14:42:35.983857\"}, {\"name\": \"subagents\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.701839\"}, {\"name\": \"test_server.py\", \"type\": \"file\", \"size\": 7889, \"modified\": \"2026-03-22T10:53:41.701839\"}, {\"name\": \"tests\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.703839\"}, {\"name\": \"tools\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-22T10:53:41.710839\"}, {\"name\": \"uploads\", \"type\": \"directory\", \"size\": null, \"modified\": \"2026-03-21T12:23:56.053485\"}], \"count\": 25}, \"tool\": \"list_directory\", \"timestamp\": \"2026-03-23T20:32:20.596797\"}\n\n如果你需要我执行操作，请明确告诉我，比如:\n- 读取 /path/to/file 文件\n- 列出 /path/to/directory 目录\n- 执行命令: ls -la",
+        "tools_used": [
+          "list_directory"
+        ],
+        "tool_results": [
+          {
+            "tool": "list_directory",
+            "success": true,
+            "result": {
+              "success": true,
+              "result": {
+                "path": "/root/.openclaw/workspace/xuanling-ai/server",
+                "items": [
+                  {
+                    "name": ".pytest_cache",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-21T15:40:46.513701"
+                  },
+                  {
+                    "name": "ARCHITECTURE.md",
+                    "type": "file",
+                    "size": 9245,
+                    "modified": "2026-03-22T10:53:41.694839"
+                  },
+                  {
+                    "name": "__pycache__",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-23T20:30:52.564721"
+                  },
+                  {
+                    "name": "agent_manager",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-23T18:51:24.412045"
+                  },
+                  {
+                    "name": "appdata",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-22T10:53:41.695839"
+                  },
+                  {
+                    "name": "cache.py",
+                    "type": "file",
+                    "size": 7364,
+                    "modified": "2026-03-22T10:53:41.695839"
+                  },
+                  {
+                    "name": "data.json",
+                    "type": "file",
+                    "size": 27081,
+                    "modified": "2026-03-23T20:32:20.595157"
+                  },
+                  {
+                    "name": "data_backup.json",
+                    "type": "file",
+                    "size": 27081,
+                    "modified": "2026-03-23T20:32:20.593157"
+                  },
+                  {
+                    "name": "engine",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-22T10:53:41.696839"
+                  },
+                  {
+                    "name": "main.py",
+                    "type": "file",
+                    "size": 65798,
+                    "modified": "2026-03-23T20:30:21.088566"
+                  },
+                  {
+                    "name": "main.py.bak",
+                    "type": "file",
+                    "size": 22275,
+                    "modified": "2026-03-22T10:53:41.696839"
+                  },
+                  {
+                    "name": "memory",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-22T10:53:41.709839"
+                  },
+                  {
+                    "name": "project_manager",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-22T10:53:41.710839"
+                  },
+                  {
+                    "name": "projects",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-23T18:30:47.441815"
+                  },
+                  {
+                    "name": "pytest.ini",
+                    "type": "file",
+                    "size": 403,
+                    "modified": "2026-03-22T10:53:41.698839"
+                  },
+                  {
+                    "name": "requirements.txt",
+                    "type": "file",
+                    "size": 842,
+                    "modified": "2026-03-23T20:17:31.473752"
+                  },
+                  {
+                    "name": "security",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-22T10:53:41.699839"
+                  },
+                  {
+                    "name": "settings.json",
+                    "type": "file",
+                    "size": 57,
+                    "modified": "2026-03-23T20:02:24.256242"
+                  },
+                  {
+                    "name": "skills",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-22T10:53:41.699839"
+                  },
+                  {
+                    "name": "static",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-22T14:42:35.983857"
+                  },
+                  {
+                    "name": "subagents",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-22T10:53:41.701839"
+                  },
+                  {
+                    "name": "test_server.py",
+                    "type": "file",
+                    "size": 7889,
+                    "modified": "2026-03-22T10:53:41.701839"
+                  },
+                  {
+                    "name": "tests",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-22T10:53:41.703839"
+                  },
+                  {
+                    "name": "tools",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-22T10:53:41.710839"
+                  },
+                  {
+                    "name": "uploads",
+                    "type": "directory",
+                    "size": null,
+                    "modified": "2026-03-21T12:23:56.053485"
+                  }
+                ],
+                "count": 25
+              },
+              "tool": "list_directory",
+              "timestamp": "2026-03-23T20:32:20.596797"
+            }
+          }
+        ],
+        "agent_info": {
+          "name": "文档助手",
+          "role": "worker",
+          "skills": []
+        },
+        "metrics": {
+          "duration_seconds": 0.01,
+          "tool_calls": 1,
+          "ai_model": "MiniMax-M2.5"
+        }
+      },
+      "error": null,
+      "progress": 1.0,
+      "dependencies": [],
+      "artifacts": []
+    }
+  ]
 }

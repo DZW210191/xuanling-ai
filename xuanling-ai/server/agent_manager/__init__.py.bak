@@ -1,0 +1,885 @@
+"""
+玄灵AI 代理管理器 - 深度重构版
+统一数据层 + 代理模板 + 任务编排 + 分布式执行
+"""
+import os
+import json
+import uuid
+import logging
+import asyncio
+import threading
+from pathlib import Path
+from typing import Dict, List, Any, Optional, Callable
+from dataclasses import dataclass, field, asdict
+from datetime import datetime
+from enum import Enum
+from collections import defaultdict
+
+logger = logging.getLogger("玄灵AI.AgentManager")
+
+# ============== 导入 AI 引擎 ==============
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+try:
+    from engine import ai_engine, AIEngine
+    AI_ENGINE_AVAILABLE = True
+except ImportError:
+    AI_ENGINE_AVAILABLE = False
+    logger.warning("AI 引擎未找到，任务执行将不可用")
+
+# ============== 配置 ==============
+DATA_FILE = Path(__file__).parent.parent / "data.json"
+AGENT_API_CONFIG_FILE = Path(__file__).parent.parent / "agent_api_configs.json"
+
+def load_agent_api_configs():
+    """加载代理API配置"""
+    try:
+        with open(AGENT_API_CONFIG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+_agent_api_configs = load_agent_api_configs()
+
+def get_agent_api_config(agent_id: str) -> dict:
+    """获取代理的实际API配置"""
+    from main import app_settings, MINIMAX_BASE_URL, MINIMAX_API_KEY
+    
+    config = _agent_api_configs.get(agent_id, {})
+    if config.get("use_global", True):
+        # 使用全局配置
+        return {
+            "api_url": app_settings.get("apiUrl") or MINIMAX_BASE_URL,
+            "api_key": app_settings.get("apiKey") or MINIMAX_API_KEY,
+            "model": app_settings.get("model") or "MiniMax-M2.5"
+        }
+    else:
+        # 使用代理专属配置
+        return {
+            "api_url": config.get("api_url") or app_settings.get("apiUrl") or MINIMAX_BASE_URL,
+            "api_key": config.get("api_key") or app_settings.get("apiKey") or MINIMAX_API_KEY,
+            "model": config.get("model") or app_settings.get("model") or "MiniMax-M2.5"
+        }
+
+# ============== 枚举定义 ==============
+
+class AgentStatus(Enum):
+    """代理状态"""
+    IDLE = "idle"           # 空闲
+    RUNNING = "running"     # 运行中
+    PAUSED = "paused"       # 已暂停
+    ERROR = "error"         # 错误
+    STOPPED = "stopped"     # 已停止
+
+class AgentRole(Enum):
+    """代理角色"""
+    WORKER = "worker"       # 执行器 - 执行具体任务
+    PLANNER = "planner"     # 规划器 - 分解复杂任务
+    REVIEWER = "reviewer"   # 审查器 - 检查结果质量
+    COORDINATOR = "coordinator"  # 协调器 - 管理多代理协作
+    CODER = "coder"         # 编程代理 - 编写代码
+    RESEARCHER = "researcher"  # 研究代理 - 搜索分析
+    WRITER = "writer"       # 写作代理 - 生成文档
+
+class TaskStatus(Enum):
+    """任务状态"""
+    PENDING = "pending"
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+class TaskPriority(Enum):
+    """任务优先级"""
+    LOW = 1
+    NORMAL = 5
+    HIGH = 10
+    CRITICAL = 20
+    URGENT = 30
+
+# ============== 代理模板 ==============
+
+AGENT_TEMPLATES = {
+    "worker": {
+        "name": "执行代理",
+        "description": "执行具体任务，如文件操作、数据处理",
+        "icon": "⚙️",
+        "skills": ["file_ops", "data_process"],
+        "max_concurrent_tasks": 3,
+        "system_prompt": "你是一个任务执行代理，负责完成具体的操作任务。"
+    },
+    "planner": {
+        "name": "规划代理",
+        "description": "分析复杂目标，分解为可执行的子任务",
+        "icon": "📋",
+        "skills": ["task_planning", "goal_analysis"],
+        "max_concurrent_tasks": 2,
+        "system_prompt": "你是一个任务规划代理，负责将复杂目标分解为可执行的步骤。"
+    },
+    "reviewer": {
+        "name": "审查代理",
+        "description": "检查任务结果，确保质量达标",
+        "icon": "🔍",
+        "skills": ["code_review", "quality_check"],
+        "max_concurrent_tasks": 5,
+        "system_prompt": "你是一个质量审查代理，负责检查任务结果是否符合要求。"
+    },
+    "coordinator": {
+        "name": "协调代理",
+        "description": "管理多代理协作，聚合结果",
+        "icon": "🎭",
+        "skills": ["coordination", "result_merge"],
+        "max_concurrent_tasks": 1,
+        "system_prompt": "你是一个协调代理，负责管理多个代理之间的协作。"
+    },
+    "coder": {
+        "name": "编程代理",
+        "description": "编写、修改、调试代码",
+        "icon": "💻",
+        "skills": ["code_gen", "debug", "refactor"],
+        "max_concurrent_tasks": 2,
+        "system_prompt": "你是一个编程代理，负责编写和修改代码。"
+    },
+    "researcher": {
+        "name": "研究代理",
+        "description": "搜索资料、分析信息",
+        "icon": "🔬",
+        "skills": ["web_search", "data_analysis"],
+        "max_concurrent_tasks": 3,
+        "system_prompt": "你是一个研究代理，负责搜集和分析信息。"
+    },
+    "writer": {
+        "name": "写作代理",
+        "description": "生成文档、报告、文章",
+        "icon": "✍️",
+        "skills": ["doc_gen", "report_write"],
+        "max_concurrent_tasks": 2,
+        "system_prompt": "你是一个写作代理，负责生成各类文档和文章。"
+    }
+}
+
+# ============== 数据模型 ==============
+
+@dataclass
+class AgentTask:
+    """代理任务"""
+    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    title: str = ""
+    description: str = ""
+    goal: str = ""
+    status: TaskStatus = TaskStatus.PENDING
+    priority: TaskPriority = TaskPriority.NORMAL
+    assigned_agent: Optional[str] = None
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    result: Optional[Dict] = None
+    error: Optional[str] = None
+    progress: float = 0.0
+    logs: List[Dict] = field(default_factory=list)
+    dependencies: List[str] = field(default_factory=list)
+    artifacts: List[str] = field(default_factory=list)  # 产出文件
+    
+    def to_dict(self) -> Dict:
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "goal": self.goal,
+            "status": self.status.value,
+            "priority": self.priority.value,
+            "assigned_agent": self.assigned_agent,
+            "created_at": self.created_at,
+            "started_at": self.started_at,
+            "completed_at": self.completed_at,
+            "result": self.result,
+            "error": self.error,
+            "progress": self.progress,
+            "dependencies": self.dependencies,
+            "artifacts": self.artifacts
+        }
+
+@dataclass
+class Agent:
+    """代理定义"""
+    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    name: str = ""
+    description: str = ""
+    role: AgentRole = AgentRole.WORKER
+    status: AgentStatus = AgentStatus.IDLE
+    icon: str = "🤖"
+    skills: List[str] = field(default_factory=list)
+    max_concurrent_tasks: int = 3
+    system_prompt: str = ""
+    model: str = "MiniMax-M2.5"
+    created_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
+    
+    # 运行时统计
+    total_tasks: int = 0
+    completed_tasks: int = 0
+    failed_tasks: int = 0
+    success_rate: float = 1.0
+    
+    # 当前任务
+    current_tasks: List[str] = field(default_factory=list)
+    
+    # 配置
+    auto_start: bool = True
+    timeout: int = 300  # 秒
+    
+    def to_dict(self) -> Dict:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "description": self.description,
+            "role": self.role.value,
+            "status": self.status.value,
+            "icon": self.icon,
+            "skills": self.skills,
+            "max_concurrent_tasks": self.max_concurrent_tasks,
+            "system_prompt": self.system_prompt,
+            "model": self.model,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "stats": {
+                "total_tasks": self.total_tasks,
+                "completed_tasks": self.completed_tasks,
+                "failed_tasks": self.failed_tasks,
+                "success_rate": round(self.success_rate * 100, 1)
+            },
+            "current_tasks": self.current_tasks,
+            "auto_start": self.auto_start,
+            "timeout": self.timeout
+        }
+
+# ============== 代理管理器 ==============
+
+class AgentManager:
+    """代理管理器 - 统一数据层"""
+    
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        if self._initialized:
+            return
+        self._initialized = True
+        
+        self._agents: Dict[str, Agent] = {}
+        self._tasks: Dict[str, AgentTask] = {}
+        self._agent_tasks: Dict[str, List[str]] = defaultdict(list)  # agent_id -> task_ids
+        self._task_queue: asyncio.Queue = None
+        self._running = False
+        
+        self._data_lock = threading.Lock()
+        self._load_data()
+        
+        logger.info(f"代理管理器初始化完成，加载 {len(self._agents)} 个代理")
+    
+    def _load_data(self):
+        """从文件加载数据"""
+        try:
+            if DATA_FILE.exists():
+                with open(DATA_FILE, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                # 加载代理
+                for agent_data in data.get('agents', []):
+                    agent = Agent(
+                        id=str(agent_data.get('id', uuid.uuid4().hex[:8])),
+                        name=agent_data.get('name', '未命名代理'),
+                        description=agent_data.get('description', ''),
+                        role=AgentRole(agent_data.get('role', 'worker')),
+                        status=AgentStatus(agent_data.get('status', 'idle')),
+                        icon=agent_data.get('icon', '🤖'),
+                        skills=agent_data.get('skills', []),
+                        total_tasks=agent_data.get('total_tasks', 0),
+                        completed_tasks=agent_data.get('completed_tasks', 0),
+                        failed_tasks=agent_data.get('failed_tasks', 0),
+                        success_rate=agent_data.get('success_rate', 1.0)
+                    )
+                    self._agents[agent.id] = agent
+                
+                # 加载任务
+                for task_data in data.get('agent_tasks_data', []):
+                    task = AgentTask(
+                        id=task_data.get('id', uuid.uuid4().hex[:8]),
+                        title=task_data.get('title', ''),
+                        description=task_data.get('description', ''),
+                        goal=task_data.get('goal', ''),
+                        status=TaskStatus(task_data.get('status', 'pending')),
+                        priority=TaskPriority(task_data.get('priority', 5)),
+                        assigned_agent=task_data.get('assigned_agent'),
+                        created_at=task_data.get('created_at', datetime.now().isoformat()),
+                        result=task_data.get('result'),
+                        error=task_data.get('error'),
+                        progress=task_data.get('progress', 0)
+                    )
+                    self._tasks[task.id] = task
+                    if task.assigned_agent:
+                        self._agent_tasks[task.assigned_agent].append(task.id)
+                        
+        except Exception as e:
+            logger.error(f"加载数据失败: {e}")
+    
+    def _save_data(self):
+        """保存数据到文件 (带备份和事务保护)"""
+        with self._data_lock:
+            try:
+                # 1. 创建备份
+                backup_file = DATA_FILE.parent / "data_backup.json"
+                if DATA_FILE.exists():
+                    try:
+                        import shutil
+                        shutil.copy2(DATA_FILE, backup_file)
+                    except Exception as backup_err:
+                        logger.warning(f"创建备份失败: {backup_err}")
+                
+                # 2. 读取现有数据
+                data = {}
+                if DATA_FILE.exists():
+                    with open(DATA_FILE, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                
+                # 3. 更新代理数据
+                data['agents'] = [a.to_dict() for a in self._agents.values()]
+                
+                # 4. 更新任务数据
+                data['agent_tasks_data'] = [t.to_dict() for t in self._tasks.values()]
+                
+                # 5. 更新 next_ids
+                if 'next_ids' not in data:
+                    data['next_ids'] = {}
+                data['next_ids']['agent'] = max([int(a.id) for a in self._agents.values() if a.id.isdigit()] + [0]) + 1
+                data['next_ids']['agent_task'] = max([int(t.id) for t in self._tasks.values() if t.id.isdigit()] + [0]) + 1
+                
+                # 6. 先写入临时文件
+                temp_file = DATA_FILE.parent / "data_temp.json"
+                with open(temp_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                
+                # 7. 原子替换
+                temp_file.replace(DATA_FILE)
+                
+                # 8. 验证
+                if DATA_FILE.exists() and DATA_FILE.stat().st_size > 0:
+                    logger.debug(f"代理数据保存成功: {len(self._agents)} 个代理, {len(self._tasks)} 个任务")
+                else:
+                    raise IOError("保存后文件无效")
+                    
+            except IOError as e:
+                logger.error(f"保存数据失败 (IO错误): {e}")
+                # 尝试从备份恢复
+                backup_file = DATA_FILE.parent / "data_backup.json"
+                if backup_file.exists():
+                    try:
+                        import shutil
+                        shutil.copy2(backup_file, DATA_FILE)
+                        logger.info("已从备份恢复代理数据")
+                    except Exception as restore_err:
+                        logger.error(f"恢复备份失败: {restore_err}")
+            except Exception as e:
+                logger.error(f"保存数据失败: {e}", exc_info=True)
+    
+    # ============== 代理管理 ==============
+    
+    def create_agent(self, name: str, role: str = "worker", description: str = "", 
+                     skills: List[str] = None, template: str = None) -> Agent:
+        """创建代理"""
+        # 使用模板
+        if template and template in AGENT_TEMPLATES:
+            tmpl = AGENT_TEMPLATES[template]
+            agent = Agent(
+                id=str(uuid.uuid4().hex[:8]),
+                name=name or tmpl['name'],
+                description=description or tmpl['description'],
+                role=AgentRole(template),
+                icon=tmpl['icon'],
+                skills=skills or tmpl['skills'],
+                max_concurrent_tasks=tmpl['max_concurrent_tasks'],
+                system_prompt=tmpl['system_prompt']
+            )
+        else:
+            agent = Agent(
+                id=str(uuid.uuid4().hex[:8]),
+                name=name,
+                description=description,
+                role=AgentRole(role) if role in [r.value for r in AgentRole] else AgentRole.WORKER,
+                skills=skills or []
+            )
+        
+        self._agents[agent.id] = agent
+        self._save_data()
+        logger.info(f"创建代理: {agent.name} ({agent.id})")
+        return agent
+    
+    def get_agent(self, agent_id: str) -> Optional[Agent]:
+        """获取代理"""
+        return self._agents.get(agent_id)
+    
+    def list_agents(self, status: AgentStatus = None, role: AgentRole = None) -> List[Agent]:
+        """列出代理"""
+        agents = list(self._agents.values())
+        if status:
+            agents = [a for a in agents if a.status == status]
+        if role:
+            agents = [a for a in agents if a.role == role]
+        return agents
+    
+    def update_agent(self, agent_id: str, **kwargs) -> Optional[Agent]:
+        """更新代理"""
+        agent = self._agents.get(agent_id)
+        if not agent:
+            return None
+        
+        for key, value in kwargs.items():
+            if hasattr(agent, key):
+                if key == 'role' and isinstance(value, str):
+                    value = AgentRole(value)
+                elif key == 'status' and isinstance(value, str):
+                    value = AgentStatus(value)
+                setattr(agent, key, value)
+        
+        agent.updated_at = datetime.now().isoformat()
+        self._save_data()
+        return agent
+    
+    def delete_agent(self, agent_id: str) -> bool:
+        """删除代理"""
+        if agent_id not in self._agents:
+            return False
+        
+        # 取消该代理的所有任务
+        for task_id in self._agent_tasks.get(agent_id, []):
+            if task_id in self._tasks:
+                self._tasks[task_id].status = TaskStatus.CANCELLED
+        
+        del self._agents[agent_id]
+        del self._agent_tasks[agent_id]
+        self._save_data()
+        logger.info(f"删除代理: {agent_id}")
+        return True
+    
+    def start_agent(self, agent_id: str) -> bool:
+        """启动代理"""
+        agent = self._agents.get(agent_id)
+        if not agent:
+            return False
+        agent.status = AgentStatus.RUNNING
+        agent.updated_at = datetime.now().isoformat()
+        self._save_data()
+        logger.info(f"启动代理: {agent.name}")
+        return True
+    
+    def pause_agent(self, agent_id: str) -> bool:
+        """暂停代理"""
+        agent = self._agents.get(agent_id)
+        if not agent:
+            return False
+        agent.status = AgentStatus.PAUSED
+        agent.updated_at = datetime.now().isoformat()
+        self._save_data()
+        logger.info(f"暂停代理: {agent.name}")
+        return True
+    
+    def stop_agent(self, agent_id: str) -> bool:
+        """停止代理"""
+        agent = self._agents.get(agent_id)
+        if not agent:
+            return False
+        agent.status = AgentStatus.STOPPED
+        agent.current_tasks = []
+        agent.updated_at = datetime.now().isoformat()
+        self._save_data()
+        logger.info(f"停止代理: {agent.name}")
+        return True
+    
+    # ============== 任务管理 ==============
+    
+    def create_task(self, title: str, description: str = "", goal: str = "",
+                    priority: int = 5, assigned_agent: str = None,
+                    dependencies: List[str] = None) -> AgentTask:
+        """创建任务"""
+        task = AgentTask(
+            title=title,
+            description=description,
+            goal=goal,
+            priority=TaskPriority(priority) if priority in [p.value for p in TaskPriority] else TaskPriority.NORMAL,
+            assigned_agent=assigned_agent,
+            dependencies=dependencies or []
+        )
+        
+        self._tasks[task.id] = task
+        if assigned_agent:
+            self._agent_tasks[assigned_agent].append(task.id)
+            agent = self._agents.get(assigned_agent)
+            if agent:
+                agent.total_tasks += 1
+        
+        self._save_data()
+        logger.info(f"创建任务: {title} ({task.id})")
+        return task
+    
+    def get_task(self, task_id: str) -> Optional[AgentTask]:
+        """获取任务"""
+        return self._tasks.get(task_id)
+    
+    def list_tasks(self, agent_id: str = None, status: TaskStatus = None) -> List[AgentTask]:
+        """列出任务"""
+        if agent_id:
+            task_ids = self._agent_tasks.get(agent_id, [])
+            tasks = [self._tasks.get(tid) for tid in task_ids if tid in self._tasks]
+        else:
+            tasks = list(self._tasks.values())
+        
+        if status:
+            tasks = [t for t in tasks if t.status == status]
+        
+        return sorted(tasks, key=lambda t: t.created_at, reverse=True)
+    
+    def update_task(self, task_id: str, **kwargs) -> Optional[AgentTask]:
+        """更新任务"""
+        task = self._tasks.get(task_id)
+        if not task:
+            return None
+        
+        for key, value in kwargs.items():
+            if hasattr(task, key):
+                if key == 'status' and isinstance(value, str):
+                    value = TaskStatus(value)
+                elif key == 'priority' and isinstance(value, int):
+                    value = TaskPriority(value) if value in [p.value for p in TaskPriority] else task.priority
+                setattr(task, key, value)
+        
+        # 如果任务完成，更新代理统计
+        if kwargs.get('status') == 'completed':
+            agent = self._agents.get(task.assigned_agent)
+            if agent:
+                agent.completed_tasks += 1
+                agent.success_rate = agent.completed_tasks / max(agent.total_tasks, 1)
+                if task.id in agent.current_tasks:
+                    agent.current_tasks.remove(task.id)
+        
+        elif kwargs.get('status') == 'failed':
+            agent = self._agents.get(task.assigned_agent)
+            if agent:
+                agent.failed_tasks += 1
+                agent.success_rate = agent.completed_tasks / max(agent.total_tasks, 1)
+                if task.id in agent.current_tasks:
+                    agent.current_tasks.remove(task.id)
+        
+        self._save_data()
+        return task
+    
+    def delete_task(self, task_id: str) -> bool:
+        """删除任务"""
+        if task_id not in self._tasks:
+            return False
+        
+        task = self._tasks[task_id]
+        
+        # 从代理任务列表移除
+        if task.assigned_agent and task.assigned_agent in self._agent_tasks:
+            if task_id in self._agent_tasks[task.assigned_agent]:
+                self._agent_tasks[task.assigned_agent].remove(task_id)
+        
+        del self._tasks[task_id]
+        self._save_data()
+        return True
+    
+    # ============== 统计信息 ==============
+    
+    def get_stats(self) -> Dict:
+        """获取统计信息"""
+        agents = list(self._agents.values())
+        tasks = list(self._tasks.values())
+        
+        status_counts = defaultdict(int)
+        for t in tasks:
+            status_counts[t.status.value] += 1
+        
+        return {
+            "total_agents": len(agents),
+            "active_agents": len([a for a in agents if a.status == AgentStatus.RUNNING]),
+            "total_tasks": len(tasks),
+            "status_counts": dict(status_counts),
+            "agents_overview": {
+                a.id: {
+                    "name": a.name,
+                    "status": a.status.value,
+                    "current_tasks": len(a.current_tasks),
+                    "success_rate": round(a.success_rate * 100, 1)
+                } for a in agents
+            }
+        }
+    
+    # ============== 任务执行引擎 ==============
+    
+    async def execute_task(self, task_id: str, use_ai: bool = True) -> Dict:
+        """执行任务 - 真正调用 AI 引擎并执行工具"""
+        task = self._tasks.get(task_id)
+        if not task:
+            return {"error": "任务不存在"}
+        
+        agent = self._agents.get(task.assigned_agent)
+        if not agent:
+            return {"error": "代理不存在"}
+        
+        if agent.status != AgentStatus.RUNNING:
+            return {"error": "代理未运行，请先启动代理"}
+        
+        # 开始执行
+        task.status = TaskStatus.RUNNING
+        task.started_at = datetime.now().isoformat()
+        task.progress = 0.0
+        agent.current_tasks.append(task_id)
+        self._save_data()
+        
+        logs = []
+        start_time = datetime.now()
+        tool_results = []  # 记录所有工具调用结果
+        
+        # 检查 AI 引擎是否可用
+        if not AI_ENGINE_AVAILABLE:
+            task.status = TaskStatus.FAILED
+            task.error = "AI 引擎不可用，请检查配置"
+            self._save_data()
+            return {"error": "AI 引擎不可用，请检查 API 配置"}
+        
+        if not use_ai:
+            task.status = TaskStatus.FAILED
+            task.error = "任务需要 AI 执行，但 use_ai=False"
+            self._save_data()
+            return {"error": "任务执行需要启用 AI 模式"}
+        
+        try:
+            # ============== 获取代理专属 API 配置 ==============
+        agent_config = get_agent_api_config(agent.id)
+        logger.info(f"代理 {agent.name} 使用配置: model={agent_config['model']}, url={agent_config['api_url'][:30]}...")
+            
+                # 创建临时引擎实例（使用代理配置）
+            temp_engine = AIEngine()
+            temp_engine.configure(
+                api_key=agent_config["api_key"],
+                api_url=agent_config["api_url"],
+                model=agent_config["model"]
+            )
+            
+                # ============== 真正调用 AI 引擎（带工具调用）==============
+            
+                # 1. 构建代理的系统提示
+            system_prompt = agent.system_prompt or f"你是{agent.name}，一个{agent.role.value}类型的智能代理。"
+            system_prompt += f"\n\n你具备以下技能：{', '.join(agent.skills) if agent.skills else '通用能力'}"
+            system_prompt += "\n\n你可以使用工具来完成任务：读取文件、写入文件、执行命令、网络请求等。"
+            system_prompt += "\n\n请用中文回复，保持简洁专业。执行操作时直接调用工具，不要只是描述。"
+            
+                # 2. 构建任务消息
+            user_message = f"""请执行以下任务：
+
+**任务标题**: {task.title}
+**任务描述**: {task.description or '无详细描述'}
+**任务目标**: {task.goal or '完成指定工作'}
+
+请分析任务需求，选择合适的工具执行操作，并报告执行结果。"""
+            
+                # 记录：开始分析
+            log_entry = {"time": datetime.now().isoformat(), "step": "开始执行", "progress": 0.1}
+            logs.append(log_entry)
+            task.logs.append(log_entry)
+            self._save_data()
+            
+            logger.info(f"代理 {agent.name} 开始执行任务: {task.title}")
+            
+                # 3. 使用代理专属引擎的完整工具调用流程
+            final_content = ""
+            async for event in temp_engine.chat(user_message, system_prompt=system_prompt):
+                event_type = event.get("type", "")
+                
+                if event_type == "tool_calls_start":
+                    log_entry = {
+                        "time": datetime.now().isoformat(),
+                        "step": f"调用工具: {', '.join(event.get('tools', []))}",
+                        "progress": 0.3
+                    }
+                    logs.append(log_entry)
+                    task.logs.append(log_entry)
+                    task.progress = 0.3
+                    self._save_data()
+                    
+                elif event_type == "tool_call":
+                    tool_name = event.get("name", "")
+                    tool_args = event.get("arguments", "")
+                    log_entry = {
+                        "time": datetime.now().isoformat(),
+                        "step": f"执行 {tool_name}",
+                        "detail": tool_args[:100] if len(tool_args) > 100 else tool_args,
+                        "progress": 0.5
+                    }
+                    logs.append(log_entry)
+                    task.logs.append(log_entry)
+                    logger.info(f"🔧 执行工具: {tool_name}")
+                    
+                elif event_type == "tool_result":
+                    tool_name = event.get("name", "")
+                    result = event.get("result", {})
+                    tool_results.append({
+                        "tool": tool_name,
+                        "success": result.get("success", True),
+                        "result": result.get("result", result)
+                    })
+                    log_entry = {
+                        "time": datetime.now().isoformat(),
+                        "step": f"{tool_name} 完成",
+                        "success": result.get("success", True),
+                        "progress": 0.7
+                    }
+                    logs.append(log_entry)
+                    task.logs.append(log_entry)
+                    task.progress = 0.7
+                    self._save_data()
+                    
+                elif event_type == "text":
+                    final_content = event.get("content", "")
+                    log_entry = {
+                        "time": datetime.now().isoformat(),
+                        "step": "生成报告",
+                        "progress": 0.9
+                    }
+                    logs.append(log_entry)
+                    task.logs.append(log_entry)
+                    task.progress = 0.9
+                    self._save_data()
+                    
+                elif event_type == "error":
+                    error_msg = event.get("content", "未知错误")
+                    log_entry = {
+                        "time": datetime.now().isoformat(),
+                        "step": "错误",
+                        "error": error_msg,
+                        "progress": 0.5
+                    }
+                    logs.append(log_entry)
+                    task.logs.append(log_entry)
+                    logger.error(f"任务执行错误: {error_msg}")
+            
+                # 4. 生成最终结果
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+            
+            task.result = {
+                "summary": final_content or f"任务 '{task.title}' 执行完成",
+                "ai_response": final_content,
+                "tools_used": [tr["tool"] for tr in tool_results],
+                "tool_results": tool_results,
+                "agent_info": {
+                    "name": agent.name,
+                    "role": agent.role.value,
+                    "skills": agent.skills
+                },
+                "metrics": {
+                    "duration_seconds": round(duration, 2),
+                    "tool_calls": len(tool_results),
+                    "ai_model": temp_engine.model if hasattr(temp_engine, 'model') else "unknown"
+                }
+            }
+            
+            # 完成任务
+        task.status = TaskStatus.COMPLETED
+        task.completed_at = datetime.now().isoformat()
+        task.progress = 1.0
+        
+            # 更新代理统计
+        if task_id in agent.current_tasks:
+            agent.current_tasks.remove(task_id)
+        agent.completed_tasks += 1
+        agent.success_rate = agent.completed_tasks / max(agent.total_tasks, 1)
+        
+        self._save_data()
+        logger.info(f"任务完成: {task.title}")
+        
+        return {"success": True, "task": task.to_dict(), "logs": logs}
+        
+        except Exception as e:
+            # 执行失败
+            logger.error(f"任务执行失败: {e}")
+            task.status = TaskStatus.FAILED
+            task.error = str(e)
+            
+            if task_id in agent.current_tasks:
+                agent.current_tasks.remove(task_id)
+            agent.failed_tasks += 1
+            agent.success_rate = agent.completed_tasks / max(agent.total_tasks, 1)
+            
+            self._save_data()
+            return {"error": str(e), "task": task.to_dict()}
+    
+    def add_task_log(self, task_id: str, message: str, level: str = "info") -> bool:
+        """添加任务日志"""
+        task = self._tasks.get(task_id)
+        if not task:
+            return False
+        
+        task.logs.append({
+            "time": datetime.now().isoformat(),
+            "message": message,
+            "level": level
+        })
+        self._save_data()
+        return True
+    
+    def update_task_progress(self, task_id: str, progress: float, status: str = None, 
+                             result: Dict = None, error: str = None) -> Optional[AgentTask]:
+        """更新任务进度"""
+        task = self._tasks.get(task_id)
+        if not task:
+            return None
+        
+        task.progress = min(1.0, max(0.0, progress))
+        
+        if status:
+            task.status = TaskStatus(status) if status in [s.value for s in TaskStatus] else task.status
+            if status == "completed":
+                task.completed_at = datetime.now().isoformat()
+        
+        if result:
+            task.result = result
+        
+        if error:
+            task.error = error
+            task.status = TaskStatus.FAILED
+        
+        self._save_data()
+        return task
+    
+    def get_task_logs(self, task_id: str) -> List[Dict]:
+        """获取任务日志"""
+        task = self._tasks.get(task_id)
+        if not task:
+            return []
+        return task.logs
+
+# ============== 全局实例 ==============
+agent_manager = AgentManager()
+
+# ============== 便捷函数 ==============
+def create_agent(name: str, **kwargs) -> Agent:
+    return agent_manager.create_agent(name, **kwargs)
+
+def get_agent(agent_id: str) -> Optional[Agent]:
+    return agent_manager.get_agent(agent_id)
+
+def list_agents(**kwargs) -> List[Agent]:
+    return agent_manager.list_agents(**kwargs)
+
+def create_task(title: str, **kwargs) -> AgentTask:
+    return agent_manager.create_task(title, **kwargs)

@@ -1,4 +1,5 @@
 {
-  "model": "test-model",
-  "apiUrl": "https://test.api.com"
+  "model": "gpt-5",
+  "apiUrl": "https://yunwu.ai/v1",
+  "apiKey": "sk-q8I2PyVFs692Dhyi5TeTsTEnCaaiNrgZdArdsxzEQLdmA1au"
 }

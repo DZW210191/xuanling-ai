@@ -50,6 +50,15 @@ from project_manager import (
     DocumentType, PROJECTS_DIR
 )
 
+# ============== 导入代理管理器 (深度重构版) ==============
+from agent_manager import (
+    agent_manager, Agent, AgentTask, AgentStatus, AgentRole, TaskStatus, TaskPriority,
+    AGENT_TEMPLATES
+)
+
+# ============== 导入浏览器模块 ==============
+from browser import browser_manager, web_search, web_scrape, web_screenshot
+
 # ============== 日志配置 ==============
 logging.basicConfig(
     level=logging.INFO,
@@ -88,10 +97,15 @@ def load_settings():
         return {"model": "MiniMax-M2.5", "apiUrl": "https://api.minimax.chat/v1", "apiKey": ""}
 
 def save_settings_to_file(settings: dict):
-    """保存设置到文件（不包含 API Key）"""
+    """保存设置到文件"""
+    to_save = {
+        "model": settings.get("model", ""),
+        "apiUrl": settings.get("apiUrl", ""),
+        "apiKey": settings.get("apiKey", "")
+    }
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-        json.dump({"model": settings.get("model"), "apiUrl": settings.get("apiUrl")}, f, ensure_ascii=False, indent=2)
-    logger.info(f"设置已保存: model={settings.get('model')}, apiUrl={settings.get('apiUrl')}")
+        json.dump(to_save, f, ensure_ascii=False, indent=2)
+    logger.info(f"设置已保存: model={settings.get('model')}, apiUrl={settings.get('apiUrl')}, apiKey={'已配置' if settings.get('apiKey') else '未配置'}")
 
 # 全局设置
 app_settings = load_settings()
@@ -113,7 +127,8 @@ def load_data():
             "channels": [],
             "agent_memories": {},
             "agent_tasks": {},
-            "next_ids": {"project": 1, "memory": 1, "agent": 1, "agent_memory": 1}
+            "conversations": {},  # 对话历史存储: {session_id: {messages: [], created_at, updated_at}}
+            "next_ids": {"project": 1, "memory": 1, "agent": 1, "agent_memory": 1, "conversation": 1, "message": 1}
         }
 
 def save_data(data):
@@ -183,10 +198,13 @@ class AgentMemoryRequest(BaseModel):
     content: Optional[str] = Field(default="", max_length=10000, description="记忆内容")
 
 class SettingsRequest(BaseModel):
-    """设置请求"""
-    model: str = Field(..., min_length=1, max_length=100, description="模型名称")
-    apiUrl: str = Field(..., min_length=1, max_length=500, description="API 地址")
-    apiKey: Optional[str] = None
+    """设置请求 - 同时支持 camelCase 和 snake_case 字段名"""
+    model: Optional[str] = Field(default="", max_length=100, description="模型名称")
+    apiUrl: Optional[str] = Field(default="", alias="api_url", max_length=500, description="API 地址")
+    apiKey: Optional[str] = Field(default=None, alias="api_key", description="API Key")
+    
+    class Config:
+        populate_by_name = True  # 允许通过别名填充
 
 class ChannelRequest(BaseModel):
     """频道配置请求"""
@@ -233,6 +251,16 @@ async def lifespan(app: FastAPI):
     # 初始化缓存
     init_cache(default_ttl=60, max_size=500)
     logger.info("✅ 缓存系统初始化完成")
+    
+    # 初始化 AI 引擎配置
+    api_key = app_settings.get("apiKey") or MINIMAX_API_KEY
+    api_url = app_settings.get("apiUrl") or MINIMAX_BASE_URL
+    model = app_settings.get("model") or "MiniMax-M2.5"
+    if api_key and api_url:
+        ai_engine.configure(api_key=api_key, api_url=api_url, model=model)
+        logger.info(f"✅ AI 引擎配置完成: model={model}, url={api_url}")
+    else:
+        logger.warning("⚠️ AI 引擎未配置 API Key，对话功能将不可用")
     
     # 初始化技能管理器
     skill_manager.set_tool_registry(tool_registry)
@@ -293,8 +321,7 @@ async def call_minimax_ai(user_message: str) -> str:
     model = app_settings.get("model") or "MiniMax-M2.5"
     
     if not api_key or api_key == "test-key":
-        logger.warning("未配置有效的 API Key，使用模拟回复")
-        return await mock_ai_response(user_message)
+        return "⚠️ API Key 未配置，请在系统设置中配置 API Key 后重试。"
     
     try:
         import aiohttp
@@ -330,43 +357,23 @@ async def call_minimax_ai(user_message: str) -> str:
                     choices = data.get("choices", [])
                     if choices:
                         msg = choices[0].get("message", {})
-                        return msg.get("content", msg.get("text", "抱歉，AI 响应为空"))
+                        return msg.get("content", msg.get("text", "⚠️ AI 响应为空"))
                     
                     if data.get("base_resp", {}).get("status_msg"):
                         error_msg = data["base_resp"]["status_msg"]
                         logger.error(f"AI API 返回错误: {error_msg}")
-                        return f"API 错误: {error_msg}"
+                        return f"⚠️ API 错误: {error_msg}"
                     
-                    return "抱歉，AI 响应为空"
+                    return "⚠️ AI 响应为空"
                 else:
                     error_text = await resp.text()
                     logger.error(f"AI API 错误: {resp.status} - {error_text}")
-                    return f"API 错误 ({resp.status}): {error_text[:100]}"
+                    return f"⚠️ API 错误 ({resp.status}): {error_text[:100]}"
     except ImportError:
-        return await mock_ai_response(user_message)
+        return "⚠️ aiohttp 模块未安装，无法调用 API"
     except Exception as e:
         logger.error(f"AI 调用失败: {e}")
-        return await mock_ai_response(user_message)
-
-async def mock_ai_response(message: str) -> str:
-    """模拟 AI 回复"""
-    msg = message.lower()
-    
-    if "你好" in msg or "hi" in msg or "hello" in msg:
-        return "你好！我是玄灵AI，很高兴见到你！有什么我可以帮你的吗？"
-    elif "项目" in msg:
-        projects = _data.get("projects", [])
-        if projects:
-            project_list = "\n".join([f"- {p.get('icon', '📁')} {p['name']}: {p.get('description', '')}" for p in projects])
-            return f"当前有 {len(projects)} 个项目:\n{project_list}"
-        return "目前没有项目记录"
-    elif "帮助" in msg or "help" in msg:
-        return """我可以帮你:
-- 📁 管理项目 (查看、创建)
-- 🧠 管理记忆 (添加、查询)
-- 💬 对话交流"""
-    else:
-        return f"收到你的消息: {message}\n\n你可以问我关于项目、记忆的问题，或者获取帮助"
+        return f"⚠️ AI 调用失败: {str(e)}"
 
 # ============== 基础路由 ==============
 
@@ -417,6 +424,156 @@ async def chat_json(request: ChatRequest):
     response = await ai_engine.chat_simple(request.message)
     return {"message": response, "status": "ok"}
 
+# ============== 对话历史 API ==============
+
+class ConversationMessage(BaseModel):
+    """对话消息模型"""
+    role: str = Field(..., description="角色: user 或 assistant")
+    content: str = Field(..., description="消息内容")
+    timestamp: Optional[str] = Field(default=None, description="时间戳")
+
+class ConversationCreate(BaseModel):
+    """创建对话请求"""
+    title: Optional[str] = Field(default=None, description="对话标题")
+    first_message: Optional[str] = Field(default=None, description="第一条消息")
+
+class ConversationUpdate(BaseModel):
+    """更新对话请求"""
+    title: Optional[str] = None
+
+class MessageCreate(BaseModel):
+    """添加消息请求"""
+    role: str
+    content: str
+
+@app.get("/api/conversations")
+def api_list_conversations():
+    """获取所有对话列表"""
+    conversations = []
+    for conv_id, conv_data in _data.get("conversations", {}).items():
+        messages = conv_data.get("messages", [])
+        conversations.append({
+            "id": conv_id,
+            "title": conv_data.get("title", "未命名对话"),
+            "message_count": len(messages),
+            "created_at": conv_data.get("created_at"),
+            "updated_at": conv_data.get("updated_at"),
+            "preview": messages[-1].get("content", "")[:50] if messages else ""
+        })
+    
+    # 按更新时间倒序排列
+    conversations.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+    
+    return {"conversations": conversations, "count": len(conversations)}
+
+@app.post("/api/conversations")
+def api_create_conversation(request: ConversationCreate = None):
+    """创建新对话"""
+    with data_lock:
+        conv_id = _data["next_ids"].get("conversation", 1)
+        _data["next_ids"]["conversation"] = conv_id + 1
+        
+        now = datetime.now().isoformat()
+        conv_data = {
+            "id": conv_id,
+            "title": request.title if request and request.title else f"对话 {conv_id}",
+            "messages": [],
+            "created_at": now,
+            "updated_at": now
+        }
+        
+        if "conversations" not in _data:
+            _data["conversations"] = {}
+        
+        _data["conversations"][str(conv_id)] = conv_data
+        save_data(_data)
+    
+    return {"status": "ok", "conversation": conv_data}
+
+@app.get("/api/conversations/{conversation_id}")
+def api_get_conversation(conversation_id: str):
+    """获取对话详情（包含所有消息）"""
+    conv = _data.get("conversations", {}).get(conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    return conv
+
+@app.put("/api/conversations/{conversation_id}")
+def api_update_conversation(conversation_id: str, request: ConversationUpdate):
+    """更新对话（如修改标题）"""
+    with data_lock:
+        conv = _data.get("conversations", {}).get(conversation_id)
+        if not conv:
+            raise HTTPException(status_code=404, detail="对话不存在")
+        
+        if request.title:
+            conv["title"] = request.title
+            conv["updated_at"] = datetime.now().isoformat()
+            save_data(_data)
+    
+    return {"status": "ok", "conversation": conv}
+
+@app.delete("/api/conversations/{conversation_id}")
+def api_delete_conversation(conversation_id: str):
+    """删除对话"""
+    with data_lock:
+        if conversation_id not in _data.get("conversations", {}):
+            raise HTTPException(status_code=404, detail="对话不存在")
+        
+        del _data["conversations"][conversation_id]
+        save_data(_data)
+    
+    return {"status": "ok", "message": "对话已删除"}
+
+@app.post("/api/conversations/{conversation_id}/messages")
+def api_add_message(conversation_id: str, message: MessageCreate):
+    """向对话添加消息"""
+    with data_lock:
+        conv = _data.get("conversations", {}).get(conversation_id)
+        if not conv:
+            raise HTTPException(status_code=404, detail="对话不存在")
+        
+        now = datetime.now().isoformat()
+        msg_data = {
+            "role": message.role,
+            "content": message.content,
+            "timestamp": now
+        }
+        
+        conv["messages"].append(msg_data)
+        conv["updated_at"] = now
+        
+        # 自动生成标题（如果是第一条用户消息）
+        if message.role == "user" and len(conv["messages"]) <= 2:
+            conv["title"] = message.content[:30] + ("..." if len(message.content) > 30 else "")
+        
+        save_data(_data)
+    
+    return {"status": "ok", "message": msg_data}
+
+@app.get("/api/conversations/{conversation_id}/messages")
+def api_get_messages(conversation_id: str):
+    """获取对话的所有消息"""
+    conv = _data.get("conversations", {}).get(conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="对话不存在")
+    
+    return {"messages": conv.get("messages", [])}
+
+@app.delete("/api/conversations/{conversation_id}/messages")
+def api_clear_messages(conversation_id: str):
+    """清空对话消息"""
+    with data_lock:
+        conv = _data.get("conversations", {}).get(conversation_id)
+        if not conv:
+            raise HTTPException(status_code=404, detail="对话不存在")
+        
+        conv["messages"] = []
+        conv["updated_at"] = datetime.now().isoformat()
+        save_data(_data)
+    
+    return {"status": "ok", "message": "消息已清空"}
+
 # ============== 设置 API ==============
 
 @app.get("/api/settings")
@@ -450,11 +607,21 @@ def save_config(settings: SettingsRequest):
     """保存配置"""
     global app_settings
     app_settings = {
-        "model": settings.model,
-        "apiUrl": settings.apiUrl,
+        "model": settings.model or app_settings.get("model", ""),
+        "apiUrl": settings.apiUrl or app_settings.get("apiUrl", ""),
         "apiKey": settings.apiKey or ""
     }
     save_settings_to_file(app_settings)
+    
+    # 重新配置 AI 引擎
+    if app_settings.get("apiKey") and app_settings.get("apiUrl"):
+        ai_engine.configure(
+            api_key=app_settings["apiKey"],
+            api_url=app_settings["apiUrl"],
+            model=app_settings.get("model", "MiniMax-M2.5")
+        )
+        logger.info(f"✅ AI 引擎已重新配置: model={app_settings.get('model')}")
+    
     return {"status": "ok", "message": "配置已保存"}
 
 @app.get("/api/models")
@@ -715,143 +882,321 @@ def api_resume_subagent(agent_id: str):
     agent.resume()
     return {"success": True, "status": "running"}
 
-# ============== 前端兼容: 子代理 API (/api/agents) ==============
+# ============== 代理管理 API (深度重构版) ==============
+
+class AgentCreateRequest(BaseModel):
+    """创建代理请求"""
+    name: str
+    role: str = "worker"
+    description: str = ""
+    template: Optional[str] = None
+    skills: List[str] = []
+
+class AgentUpdateRequest(BaseModel):
+    """更新代理请求"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    skills: Optional[List[str]] = None
+    system_prompt: Optional[str] = None
+    icon: Optional[str] = None
+    max_concurrent_tasks: Optional[int] = None
+
+class AgentTaskCreateRequest(BaseModel):
+    """创建代理任务请求"""
+    title: str
+    description: str = ""
+    goal: str = ""
+    priority: int = 5
+    assigned_agent: Optional[str] = None
 
 @app.get("/api/agents")
-def api_list_agents_compat():
-    """获取所有子代理 (前端兼容)"""
-    # 从数据文件和调度器合并数据
-    agents_list = []
-    
-    # 从数据文件获取
-    for a in _data.get("agents", []):
-        agent_id = a.get("id")
-        scheduler_agent = task_scheduler._agents.get(str(agent_id))
-        agents_list.append({
-            "id": agent_id,
-            "name": a.get("name", "未命名"),
-            "description": a.get("description", ""),
-            "status": scheduler_agent._state if scheduler_agent else a.get("status", "idle"),
-            "tasks_count": len(_data.get("agent_tasks", {}).get(str(agent_id), [])),
-            "success_rate": a.get("success_rate", 0.85)
-        })
-    
-    # 如果没有数据文件中的代理，返回调度器中的
-    if not agents_list:
-        for aid, agent in task_scheduler._agents.items():
-            agents_list.append({
-                "id": aid,
-                "name": agent.name,
-                "description": f"角色: {agent.role.value}",
-                "status": agent._state,
-                "tasks_count": len(agent._task_history),
-                "success_rate": 0.90
-            })
-    
-    return {"agents": agents_list}
+def api_list_agents():
+    """获取所有代理"""
+    agents = agent_manager.list_agents()
+    return {
+        "agents": [a.to_dict() for a in agents],
+        "count": len(agents),
+        "templates": list(AGENT_TEMPLATES.keys())
+    }
 
 @app.post("/api/agents")
-def api_create_agent_compat(agent: AgentRequest):
-    """创建子代理 (前端兼容)"""
-    with data_lock:
-        agent_id = _data["next_ids"]["agent"]
-        _data["next_ids"]["agent"] += 1
-        
-        new_agent = {
-            "id": agent_id,
-            "name": agent.name,
-            "description": agent.description or "",
-            "status": agent.status or "idle",
-            "success_rate": 0.85,
-            "created_at": datetime.now().isoformat()
-        }
-        
-        if "agents" not in _data:
-            _data["agents"] = []
-        _data["agents"].append(new_agent)
-        
-        # 初始化记忆和任务
-        if "agent_memories" not in _data:
-            _data["agent_memories"] = {}
-        if "agent_tasks" not in _data:
-            _data["agent_tasks"] = {}
-        _data["agent_memories"][str(agent_id)] = {}
-        _data["agent_tasks"][str(agent_id)] = []
-        
-        save_data(_data)
-    
-    return {"status": "ok", "agent": new_agent}
+def api_create_agent(request: AgentCreateRequest):
+    """创建新代理"""
+    agent = agent_manager.create_agent(
+        name=request.name,
+        role=request.role,
+        description=request.description,
+        template=request.template,
+        skills=request.skills
+    )
+    return {"status": "ok", "agent": agent.to_dict()}
+
+@app.get("/api/agents/templates")
+def api_get_agent_templates():
+    """获取代理模板列表"""
+    return {"templates": AGENT_TEMPLATES}
 
 @app.get("/api/agents/{agent_id}")
-def api_get_agent_compat(agent_id: str):
-    """获取子代理详情 (前端兼容)"""
-    agent_data = None
-    for a in _data.get("agents", []):
-        if str(a.get("id")) == str(agent_id):
-            agent_data = a
-            break
-    
-    if not agent_data:
-        # 尝试从调度器获取
-        scheduler_agent = task_scheduler._agents.get(agent_id)
-        if scheduler_agent:
-            return {
-                "id": agent_id,
-                "name": scheduler_agent.name,
-                "description": f"角色: {scheduler_agent.role.value}",
-                "status": scheduler_agent._state,
-                "tasks_count": len(scheduler_agent._task_history),
-                "success_rate": 0.90
-            }
+def api_get_agent(agent_id: str):
+    """获取代理详情"""
+    agent = agent_manager.get_agent(agent_id)
+    if not agent:
         raise HTTPException(status_code=404, detail="代理不存在")
     
+    # 获取代理的任务
+    tasks = agent_manager.list_tasks(agent_id=agent_id)
+    
     return {
-        "id": agent_data.get("id"),
-        "name": agent_data.get("name", "未命名"),
-        "description": agent_data.get("description", ""),
-        "status": agent_data.get("status", "idle"),
-        "tasks_count": len(_data.get("agent_tasks", {}).get(str(agent_id), [])),
-        "success_rate": agent_data.get("success_rate", 0.85)
+        "agent": agent.to_dict(),
+        "tasks": [t.to_dict() for t in tasks[:10]]  # 最近10个任务
     }
 
 @app.put("/api/agents/{agent_id}")
-def api_update_agent_compat(agent_id: str, agent: AgentRequest):
-    """更新子代理 (前端兼容)"""
-    with data_lock:
-        found = False
-        for i, a in enumerate(_data.get("agents", [])):
-            if str(a.get("id")) == str(agent_id):
-                _data["agents"][i]["name"] = agent.name
-                _data["agents"][i]["description"] = agent.description or ""
-                _data["agents"][i]["status"] = agent.status or "idle"
-                _data["agents"][i]["updated_at"] = datetime.now().isoformat()
-                found = True
-                break
-        
-        if not found:
-            raise HTTPException(status_code=404, detail="代理不存在")
-        
-        save_data(_data)
-    
-    return {"status": "ok", "message": "代理已更新"}
+def api_update_agent(agent_id: str, request: AgentUpdateRequest):
+    """更新代理"""
+    update_data = {k: v for k, v in request.dict().items() if v is not None}
+    agent = agent_manager.update_agent(agent_id, **update_data)
+    if not agent:
+        raise HTTPException(status_code=404, detail="代理不存在")
+    return {"status": "ok", "agent": agent.to_dict()}
 
 @app.delete("/api/agents/{agent_id}")
-def api_delete_agent_compat(agent_id: str):
-    """删除子代理 (前端兼容)"""
-    with data_lock:
-        original_len = len(_data.get("agents", []))
-        _data["agents"] = [a for a in _data.get("agents", []) if str(a.get("id")) != str(agent_id)]
-        
-        if len(_data["agents"]) == original_len:
-            raise HTTPException(status_code=404, detail="代理不存在")
-        
-        # 清理关联数据
-        _data.get("agent_memories", {}).pop(str(agent_id), None)
-        _data.get("agent_tasks", {}).pop(str(agent_id), None)
-        
-        save_data(_data)
-    
+def api_delete_agent(agent_id: str):
+    """删除代理"""
+    success = agent_manager.delete_agent(agent_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="代理不存在")
     return {"status": "ok", "message": "代理已删除"}
+
+@app.post("/api/agents/{agent_id}/start")
+def api_start_agent(agent_id: str):
+    """启动代理"""
+    success = agent_manager.start_agent(agent_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="代理不存在")
+    return {"status": "ok", "message": "代理已启动"}
+
+@app.post("/api/agents/{agent_id}/pause")
+def api_pause_agent(agent_id: str):
+    """暂停代理"""
+    success = agent_manager.pause_agent(agent_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="代理不存在")
+    return {"status": "ok", "message": "代理已暂停"}
+
+@app.post("/api/agents/{agent_id}/stop")
+def api_stop_agent(agent_id: str):
+    """停止代理"""
+    success = agent_manager.stop_agent(agent_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="代理不存在")
+    return {"status": "ok", "message": "代理已停止"}
+
+# ============== 代理任务 API ==============
+
+@app.get("/api/agents/{agent_id}/tasks")
+def api_get_agent_tasks(agent_id: str, status: str = None):
+    """获取代理的任务列表"""
+    task_status = TaskStatus(status) if status else None
+    tasks = agent_manager.list_tasks(agent_id=agent_id, status=task_status)
+    return {"tasks": [t.to_dict() for t in tasks], "count": len(tasks)}
+
+@app.post("/api/agents/{agent_id}/tasks")
+def api_create_agent_task(agent_id: str, request: AgentTaskCreateRequest):
+    """为代理创建任务"""
+    task = agent_manager.create_task(
+        title=request.title,
+        description=request.description,
+        goal=request.goal,
+        priority=request.priority,
+        assigned_agent=agent_id
+    )
+    return {"status": "ok", "task": task.to_dict()}
+
+@app.get("/api/agent-tasks")
+def api_list_all_tasks(status: str = None):
+    """获取所有任务"""
+    task_status = TaskStatus(status) if status else None
+    tasks = agent_manager.list_tasks(status=task_status)
+    return {"tasks": [t.to_dict() for t in tasks], "count": len(tasks)}
+
+@app.get("/api/agent-tasks/{task_id}")
+def api_get_task(task_id: str):
+    """获取任务详情"""
+    task = agent_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return task.to_dict()
+
+@app.put("/api/agent-tasks/{task_id}")
+def api_update_task(task_id: str, status: str = None, progress: float = None, result: Dict = None):
+    """更新任务状态"""
+    update_data = {}
+    if status:
+        update_data["status"] = status
+    if progress is not None:
+        update_data["progress"] = progress
+    if result:
+        update_data["result"] = result
+    
+    task = agent_manager.update_task(task_id, **update_data)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return {"status": "ok", "task": task.to_dict()}
+
+@app.delete("/api/agent-tasks/{task_id}")
+def api_delete_task(task_id: str):
+    """删除任务"""
+    success = agent_manager.delete_task(task_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return {"status": "ok", "message": "任务已删除"}
+
+@app.get("/api/agents/stats/overview")
+def api_agents_stats():
+    """获取代理统计概览"""
+    return agent_manager.get_stats()
+
+# ============== 任务执行与监控 API ==============
+
+@app.post("/api/agent-tasks/{task_id}/execute")
+async def api_execute_task(task_id: str):
+    """执行任务"""
+    result = await agent_manager.execute_task(task_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+@app.get("/api/agent-tasks/{task_id}/logs")
+def api_get_task_logs(task_id: str):
+    """获取任务执行日志"""
+    logs = agent_manager.get_task_logs(task_id)
+    return {"logs": logs, "count": len(logs)}
+
+@app.get("/api/agent-tasks/{task_id}/status")
+def api_get_task_status(task_id: str):
+    """获取任务实时状态（用于轮询）"""
+    task = agent_manager.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return {
+        "id": task.id,
+        "status": task.status.value,
+        "progress": task.progress,
+        "started_at": task.started_at,
+        "completed_at": task.completed_at,
+        "error": task.error,
+        "result": task.result
+    }
+
+@app.get("/api/agents/{agent_id}/realtime")
+def api_get_agent_realtime(agent_id: str):
+    """获取代理实时状态（用于轮询监控）"""
+    agent = agent_manager.get_agent(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="代理不存在")
+    
+    # 获取当前任务
+    current_tasks = []
+    for task_id in agent.current_tasks:
+        task = agent_manager.get_task(task_id)
+        if task:
+            current_tasks.append({
+                "id": task.id,
+                "title": task.title,
+                "status": task.status.value,
+                "progress": task.progress
+            })
+    
+    return {
+        "agent_id": agent_id,
+        "name": agent.name,
+        "status": agent.status.value,
+        "current_tasks": current_tasks,
+        "stats": {
+            "total_tasks": agent.total_tasks,
+            "completed_tasks": agent.completed_tasks,
+            "failed_tasks": agent.failed_tasks,
+            "success_rate": round(agent.success_rate * 100, 1)
+        },
+        "updated_at": agent.updated_at
+    }
+
+@app.get("/api/agents/realtime/all")
+def api_get_all_agents_realtime():
+    """获取所有代理实时状态（监控大盘）"""
+    agents = agent_manager.list_agents()
+    
+    result = []
+    for agent in agents:
+        current_tasks = []
+        for task_id in agent.current_tasks:
+            task = agent_manager.get_task(task_id)
+            if task:
+                current_tasks.append({
+                    "id": task.id,
+                    "title": task.title,
+                    "progress": task.progress
+                })
+        
+        result.append({
+            "id": agent.id,
+            "name": agent.name,
+            "icon": agent.icon,
+            "status": agent.status.value,
+            "role": agent.role.value,
+            "current_tasks": current_tasks,
+            "success_rate": round(agent.success_rate * 100, 1)
+        })
+    
+    return {"agents": result, "timestamp": datetime.now().isoformat()}
+
+# ============== SSE 实时推送 ==============
+
+@app.get("/api/agents/{agent_id}/stream")
+async def api_agent_status_stream(agent_id: str):
+    """代理状态 SSE 实时推送"""
+    from fastapi.responses import StreamingResponse
+    import asyncio
+    
+    async def event_generator():
+        while True:
+            agent = agent_manager.get_agent(agent_id)
+            if not agent:
+                yield f"data: {json.dumps({'error': '代理不存在'})}\n\n"
+                break
+            
+            # 获取当前任务状态
+            tasks_status = []
+            for task_id in agent.current_tasks:
+                task = agent_manager.get_task(task_id)
+                if task:
+                    tasks_status.append({
+                        "id": task.id,
+                        "status": task.status.value,
+                        "progress": task.progress
+                    })
+            
+            data = {
+                "agent_id": agent_id,
+                "status": agent.status.value,
+                "tasks": tasks_status,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            yield f"data: {json.dumps(data)}\n\n"
+            await asyncio.sleep(1)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+    )
+
+# ============== 旧版兼容 API ==============
+
+# 保留旧的记忆端点以兼容现有前端
 
 @app.get("/api/agents/{agent_id}/memory")
 def api_get_agent_memory_compat(agent_id: str):
@@ -882,13 +1227,7 @@ def api_add_agent_memory_compat(agent_id: str, memory: AgentMemoryRequest):
     
     return {"status": "ok", "message": "记忆已添加"}
 
-@app.get("/api/agents/{agent_id}/tasks")
-def api_get_agent_tasks_compat(agent_id: str):
-    """获取子代理任务历史 (前端兼容)"""
-    tasks = _data.get("agent_tasks", {}).get(str(agent_id), [])
-    return {"tasks": tasks}
-
-# ============== 任务系统 API ==============
+# ============== 记忆系统 API ==============
 
 @app.get("/api/tasks/stats")
 def api_task_stats():
@@ -1310,6 +1649,187 @@ def api_project_manager_stats():
     """获取项目管理统计"""
     return project_manager.get_stats()
 
+# ============== 浏览器自动化 API ==============
+
+class BrowserOpenRequest(BaseModel):
+    """打开网页请求"""
+    url: str
+    wait_until: str = "networkidle"
+
+class BrowserActionRequest(BaseModel):
+    """浏览器操作请求"""
+    ref: str = None
+    text: str = None
+    selector: str = None
+    direction: str = None
+    key: str = None
+    script: str = None
+    path: str = None
+    full_page: bool = False
+    timeout: int = 30000
+    milliseconds: int = None
+
+class WebSearchRequest(BaseModel):
+    """网页搜索请求"""
+    query: str
+    engine: str = "google"
+    max_results: int = 10
+
+class WebScrapeRequest(BaseModel):
+    """网页抓取请求"""
+    url: str
+    extract_links: bool = True
+    extract_images: bool = False
+    extract_text: bool = True
+
+@app.get("/api/browser/status")
+async def api_browser_status():
+    """获取浏览器状态"""
+    return browser_manager.get_status()
+
+@app.post("/api/browser/open")
+async def api_browser_open(request: BrowserOpenRequest):
+    """打开网页"""
+    result = await browser_manager.open(request.url, request.wait_until)
+    return result
+
+@app.post("/api/browser/navigate")
+async def api_browser_navigate(direction: str):
+    """浏览器导航 (back/forward/reload)"""
+    if direction == "back":
+        return await browser_manager.back()
+    elif direction == "forward":
+        return await browser_manager.forward()
+    elif direction == "reload":
+        return await browser_manager.reload()
+    return {"success": False, "error": f"未知方向: {direction}"}
+
+@app.post("/api/browser/close")
+async def api_browser_close():
+    """关闭浏览器"""
+    await browser_manager.close()
+    return {"success": True, "message": "浏览器已关闭"}
+
+@app.get("/api/browser/snapshot")
+async def api_browser_snapshot(interactive_only: bool = True, scope: str = None):
+    """获取页面快照"""
+    snapshot = await browser_manager.snapshot(interactive_only, scope)
+    return snapshot.to_dict()
+
+@app.post("/api/browser/click")
+async def api_browser_click(ref: str):
+    """点击元素"""
+    return await browser_manager.click(ref)
+
+@app.post("/api/browser/fill")
+async def api_browser_fill(request: BrowserActionRequest):
+    """填写输入框"""
+    return await browser_manager.fill(request.ref, request.text)
+
+@app.post("/api/browser/press")
+async def api_browser_press(key: str):
+    """按键"""
+    return await browser_manager.press(key)
+
+@app.post("/api/browser/scroll")
+async def api_browser_scroll(direction: str, distance: int = 300):
+    """滚动页面"""
+    return await browser_manager.scroll(direction, distance)
+
+@app.get("/api/browser/text")
+async def api_browser_get_text(ref: str = None, selector: str = None):
+    """获取页面文本"""
+    return await browser_manager.get_text(ref, selector)
+
+@app.get("/api/browser/html")
+async def api_browser_get_html(ref: str = None, selector: str = None):
+    """获取页面 HTML"""
+    return await browser_manager.get_html(ref, selector)
+
+@app.get("/api/browser/query")
+async def api_browser_query(selector: str):
+    """CSS 选择器查询"""
+    return await browser_manager.query(selector)
+
+@app.get("/api/browser/xpath")
+async def api_browser_xpath(expression: str):
+    """XPath 查询"""
+    return await browser_manager.xpath(expression)
+
+@app.post("/api/browser/screenshot")
+async def api_browser_screenshot(
+    path: str = None,
+    full_page: bool = False,
+    selector: str = None
+):
+    """网页截图"""
+    return await browser_manager.screenshot(path, full_page, selector)
+
+@app.post("/api/browser/wait")
+async def api_browser_wait(selector: str, timeout: int = 30000):
+    """等待元素"""
+    return await browser_manager.wait_for_selector(selector, timeout)
+
+@app.post("/api/browser/wait-load")
+async def api_browser_wait_load(state: str = "networkidle"):
+    """等待页面加载"""
+    return await browser_manager.wait_for_load(state)
+
+@app.post("/api/browser/sleep")
+async def api_browser_sleep(milliseconds: int):
+    """等待指定时间"""
+    return await browser_manager.wait(milliseconds)
+
+@app.post("/api/browser/eval")
+async def api_browser_eval(script: str):
+    """执行 JavaScript"""
+    return await browser_manager.evaluate(script)
+
+@app.get("/api/browser/cookies")
+async def api_browser_get_cookies():
+    """获取所有 Cookies"""
+    return await browser_manager.get_cookies()
+
+@app.post("/api/browser/cookie")
+async def api_browser_set_cookie(name: str, value: str, domain: str = None):
+    """设置 Cookie"""
+    return await browser_manager.set_cookie(name, value, domain)
+
+@app.delete("/api/browser/cookies")
+async def api_browser_clear_cookies():
+    """清除所有 Cookies"""
+    return await browser_manager.clear_cookies()
+
+@app.post("/api/browser/search")
+async def api_web_search(request: WebSearchRequest):
+    """网页搜索"""
+    return await web_search(request.query, request.engine, request.max_results)
+
+@app.post("/api/browser/scrape")
+async def api_web_scrape(request: WebScrapeRequest):
+    """网页抓取"""
+    return await web_scrape(
+        request.url,
+        request.extract_links,
+        request.extract_images,
+        request.extract_text
+    )
+
+@app.post("/api/browser/scrape-screenshot")
+async def api_web_screenshot(request: WebScrapeRequest, full_page: bool = True):
+    """网页截图 (自动打开并截图)"""
+    return await web_screenshot(request.url, full_page)
+
+@app.get("/api/browser/url")
+async def api_browser_get_url():
+    """获取当前 URL"""
+    return {"url": await browser_manager.get_url()}
+
+@app.get("/api/browser/title")
+async def api_browser_get_title():
+    """获取页面标题"""
+    return {"title": await browser_manager.get_title()}
+
 # ============== 前端兼容: 项目文件管理 API ==============
 
 @app.get("/project-manager/projects/{project_name}")
@@ -1498,6 +2018,94 @@ def save_channel(channel: ChannelRequest):
 def test_channel(channel_id: str, request: Request):
     """测试频道发送"""
     return {"status": "ok", "message": f"已发送到 {channel_id}"}
+
+# ============== 子代理 API 配置 ==============
+
+AGENT_API_CONFIG_FILE = BASE_DIR / "agent_api_configs.json"
+
+def load_agent_api_configs():
+    """加载代理API配置"""
+    try:
+        with open(AGENT_API_CONFIG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+def save_agent_api_configs(configs):
+    """保存代理API配置"""
+    # 不保存API Key到文件，只保存在内存中
+    safe_configs = {}
+    for agent_id, cfg in configs.items():
+        safe_configs[agent_id] = {
+            "use_global": cfg.get("use_global", True),
+            "api_url": cfg.get("api_url", ""),
+            "model": cfg.get("model", ""),
+            "has_api_key": bool(cfg.get("api_key", ""))
+        }
+    with open(AGENT_API_CONFIG_FILE, "w", encoding="utf-8") as f:
+        json.dump(safe_configs, f, ensure_ascii=False, indent=2)
+
+# 内存中的代理配置（包含API Key）
+_agent_api_configs = load_agent_api_configs()
+
+@app.get("/api/agent-api-configs")
+def get_agent_api_configs():
+    """获取所有代理的API配置"""
+    return {"configs": _agent_api_configs}
+
+@app.get("/api/agent-api-configs/{agent_id}")
+def get_agent_api_config(agent_id: str):
+    """获取单个代理的API配置"""
+    config = _agent_api_configs.get(agent_id, {"use_global": True})
+    # 不返回API Key
+    safe_config = {k: v for k, v in config.items() if k != "api_key"}
+    return {"config": safe_config}
+
+class AgentApiConfigRequest(BaseModel):
+    use_global: bool = True
+    api_url: str = ""
+    api_key: str = ""
+    model: str = ""
+
+@app.post("/api/agent-api-configs/{agent_id}")
+def set_agent_api_config(agent_id: str, config: AgentApiConfigRequest):
+    """设置代理的API配置"""
+    _agent_api_configs[agent_id] = {
+        "use_global": config.use_global,
+        "api_url": config.api_url,
+        "api_key": config.api_key,
+        "model": config.model
+    }
+    save_agent_api_configs(_agent_api_configs)
+    logger.info(f"代理 {agent_id} API配置已更新")
+    return {"success": True, "message": "配置已保存"}
+
+@app.delete("/api/agent-api-configs/{agent_id}")
+def delete_agent_api_config(agent_id: str):
+    """删除代理的API配置"""
+    if agent_id in _agent_api_configs:
+        del _agent_api_configs[agent_id]
+        save_agent_api_configs(_agent_api_configs)
+        logger.info(f"代理 {agent_id} API配置已删除")
+    return {"success": True, "message": "配置已删除"}
+
+def get_agent_api_config(agent_id: str) -> dict:
+    """获取代理的实际API配置（供内部调用）"""
+    config = _agent_api_configs.get(agent_id, {})
+    if config.get("use_global", True):
+        # 使用全局配置
+        return {
+            "api_url": app_settings.get("apiUrl") or MINIMAX_BASE_URL,
+            "api_key": app_settings.get("apiKey") or MINIMAX_API_KEY,
+            "model": app_settings.get("model") or "MiniMax-M2.5"
+        }
+    else:
+        # 使用代理专属配置
+        return {
+            "api_url": config.get("api_url") or app_settings.get("apiUrl") or MINIMAX_BASE_URL,
+            "api_key": config.get("api_key") or app_settings.get("apiKey") or MINIMAX_API_KEY,
+            "model": config.get("model") or app_settings.get("model") or "MiniMax-M2.5"
+        }
 
 # ============== 重启 API ==============
 

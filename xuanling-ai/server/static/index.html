@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧚 玄灵AI 控制台</title>
+    <title>🧚 玄灵AI 控制台 v2.2</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); min-height: 100vh; color: #fff; overflow: hidden; }
@@ -366,7 +366,8 @@
             <div class="panel" id="projectDetail">
                 <div style="display:flex;align-items:center;gap:15px;margin-bottom:15px;">
                     <button onclick="switchTo('projects')" style="background:rgba(102,126,234,0.2);border:none;color:#a0aec0;padding:8px 15px;border-radius:6px;cursor:pointer;">← 返回</button>
-                    <h2 class="panel-title" style="margin:0;" id="projectDetailTitle">📁 项目详情</h2>
+                    <h2 class="panel-title" style="margin:0;flex:1;" id="projectDetailTitle">📁 项目详情</h2>
+                    <button onclick="deleteCurrentProject()" style="background:rgba(239,68,68,0.2);border:1px solid #ef4444;color:#ef4444;padding:8px 15px;border-radius:6px;cursor:pointer;font-size:13px;">🗑️ 删除项目</button>
                 </div>
                 
                 <!-- 项目信息 -->
@@ -452,12 +453,146 @@
             
             <!-- 子代理面板 -->
             <div class="panel" id="agents">
-                <h2 class="panel-title">🤖 子代理管理</h2>
-                <div style="margin-bottom:15px;">
-                    <button onclick="showAddAgent()" style="background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;padding:10px 20px;border-radius:8px;cursor:pointer;">➕ 添加子代理</button>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                    <h2 class="panel-title" style="margin:0;">🤖 子代理管理</h2>
+                    <div>
+                        <select id="agentTemplateSelect" style="background:rgba(0,0,0,0.3);border:1px solid rgba(102,126,234,0.3);border-radius:6px;padding:8px 12px;color:#fff;margin-right:10px;">
+                            <option value="worker">⚙️ 执行代理</option>
+                            <option value="planner">📋 规划代理</option>
+                            <option value="reviewer">🔍 审查代理</option>
+                            <option value="coordinator">🎭 协调代理</option>
+                            <option value="coder">💻 编程代理</option>
+                            <option value="researcher">🔬 研究代理</option>
+                            <option value="writer">✍️ 写作代理</option>
+                        </select>
+                        <button onclick="showAddAgent()" style="background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;padding:10px 20px;border-radius:8px;cursor:pointer;">➕ 创建代理</button>
+                    </div>
                 </div>
+                
+                <!-- 代理统计卡片 -->
+                <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:15px;margin-bottom:20px;">
+                    <div style="background:rgba(102,126,234,0.1);border-radius:10px;padding:15px;text-align:center;">
+                        <div style="font-size:28px;font-weight:bold;color:#667eea;" id="statsTotalAgents">0</div>
+                        <div style="font-size:12px;color:#a0aec0;">总代理数</div>
+                    </div>
+                    <div style="background:rgba(74,222,128,0.1);border-radius:10px;padding:15px;text-align:center;">
+                        <div style="font-size:28px;font-weight:bold;color:#4ade80;" id="statsActiveAgents">0</div>
+                        <div style="font-size:12px;color:#a0aec0;">运行中</div>
+                    </div>
+                    <div style="background:rgba(251,191,36,0.1);border-radius:10px;padding:15px;text-align:center;">
+                        <div style="font-size:28px;font-weight:bold;color:#fbbf24;" id="statsTotalTasks">0</div>
+                        <div style="font-size:12px;color:#a0aec0;">总任务数</div>
+                    </div>
+                    <div style="background:rgba(239,68,68,0.1);border-radius:10px;padding:15px;text-align:center;">
+                        <div style="font-size:28px;font-weight:bold;color:#ef4444;" id="statsFailedTasks">0</div>
+                        <div style="font-size:12px;color:#a0aec0;">失败任务</div>
+                    </div>
+                </div>
+                
                 <div class="projects-grid" id="agentsGrid">
-                    <div style="color:#666;padding:20px;">加载中...</div>
+                    <div style="color:#666;padding:20px;text-align:center;grid-column:1/-1;">加载中...</div>
+                </div>
+            </div>
+            
+            <!-- 代理详情面板 -->
+            <div class="panel" id="agentDetail">
+                <div style="display:flex;align-items:center;gap:15px;margin-bottom:15px;">
+                    <button onclick="switchTo('agents')" style="background:rgba(102,126,234,0.2);border:none;color:#a0aec0;padding:8px 15px;border-radius:6px;cursor:pointer;">← 返回</button>
+                    <h2 class="panel-title" style="margin:0;flex:1;" id="agentDetailTitle">🤖 代理详情</h2>
+                    <div id="agentControlBtns"></div>
+                </div>
+                
+                <!-- 代理信息 -->
+                <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:start;">
+                        <div>
+                            <div style="font-size:32px;margin-bottom:10px;" id="agentDetailIcon">🤖</div>
+                            <div style="font-size:18px;font-weight:bold;" id="agentDetailName">代理名称</div>
+                            <div style="color:#a0aec0;font-size:14px;margin-top:5px;" id="agentDetailDesc">代理描述</div>
+                            <div style="margin-top:10px;display:flex;gap:5px;flex-wrap:wrap;" id="agentDetailSkills"></div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:12px;color:#666;">成功率</div>
+                            <div style="font-size:28px;font-weight:bold;color:#4ade80;" id="agentDetailSuccessRate">100%</div>
+                        </div>
+                    </div>
+                    <div style="margin-top:15px;display:flex;gap:10px;flex-wrap:wrap;" id="agentDetailStats"></div>
+                </div>
+                
+                <!-- 代理编辑面板 -->
+                <div id="agentEditPanel" style="display:none;background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;margin-bottom:20px;">
+                    <div style="font-weight:bold;margin-bottom:15px;color:#fbbf24;">✏️ 编辑代理配置</div>
+                    <div class="form-group">
+                        <label style="color:#a0aec0;font-size:13px;">代理名称</label>
+                        <input type="text" id="editAgentName" class="form-input" style="margin-top:5px;">
+                    </div>
+                    <div class="form-group" style="margin-top:10px;">
+                        <label style="color:#a0aec0;font-size:13px;">描述</label>
+                        <textarea id="editAgentDesc" class="form-input" rows="2" style="margin-top:5px;resize:vertical;"></textarea>
+                    </div>
+                    <div class="form-group" style="margin-top:10px;">
+                        <label style="color:#a0aec0;font-size:13px;">专业领域（逗号分隔）</label>
+                        <input type="text" id="editAgentSkills" class="form-input" placeholder="如：Python, Web开发, 数据分析" style="margin-top:5px;">
+                    </div>
+                    <div class="form-group" style="margin-top:10px;">
+                        <label style="color:#a0aec0;font-size:13px;">系统提示词（AI 人设和专业背景）</label>
+                        <textarea id="editAgentPrompt" class="form-input" rows="4" placeholder="例如：你是一个专业的Python开发专家，有10年后端开发经验..." style="margin-top:5px;resize:vertical;"></textarea>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:15px;">
+                        <button onclick="saveAgentConfig()" style="background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;padding:10px 20px;border-radius:8px;cursor:pointer;">💾 保存配置</button>
+                        <button onclick="cancelEditAgent()" style="background:rgba(102,126,234,0.2);border:none;color:#a0aec0;padding:10px 20px;border-radius:8px;cursor:pointer;">取消</button>
+                    </div>
+                </div>
+                
+                <!-- 控制按钮区 -->
+                <div style="background:rgba(0,0,0,0.2);border-radius:12px;padding:15px;margin-bottom:20px;">
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                        <button onclick="toggleEditAgent()" id="editAgentBtn" style="background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fbbf24;padding:8px 15px;border-radius:6px;cursor:pointer;">✏️ 编辑</button>
+                        <div id="agentControlBtns"></div>
+                    </div>
+                </div>
+                
+                <!-- 代理记忆系统 -->
+                <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;margin-bottom:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                        <div style="font-weight:bold;color:#667eea;">🧠 代理记忆</div>
+                        <button onclick="addAgentMemory()" style="background:rgba(102,126,234,0.2);border:none;color:#667eea;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;">+ 添加记忆</button>
+                    </div>
+                    <div id="agentMemoryList" style="max-height:200px;overflow-y:auto;">
+                        <div style="color:#666;text-align:center;padding:10px;">暂无记忆</div>
+                    </div>
+                </div>
+                
+                <!-- 快速任务分配 -->
+                <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;margin-bottom:20px;">
+                    <div style="font-weight:bold;margin-bottom:15px;color:#667eea;">📝 快速分配任务</div>
+                    <div style="display:flex;gap:10px;">
+                        <input type="text" id="quickTaskInput" placeholder="输入任务描述..." style="flex:1;background:rgba(0,0,0,0.3);border:1px solid rgba(102,126,234,0.3);border-radius:8px;padding:10px 15px;color:#fff;">
+                        <select id="quickTaskPriority" style="background:rgba(0,0,0,0.3);border:1px solid rgba(102,126,234,0.3);border-radius:6px;padding:10px;color:#fff;">
+                            <option value="1">低</option>
+                            <option value="5" selected>普通</option>
+                            <option value="10">高</option>
+                            <option value="20">紧急</option>
+                        </select>
+                        <button onclick="assignQuickTask()" style="background:linear-gradient(135deg,#667eea,#764ba2);border:none;color:#fff;padding:10px 20px;border-radius:8px;cursor:pointer;">发送</button>
+                    </div>
+                </div>
+                
+                <!-- 任务列表 -->
+                <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                        <div style="font-weight:bold;color:#667eea;">📋 任务列表</div>
+                        <select id="agentTaskFilter" onchange="loadAgentTasks()" style="background:rgba(0,0,0,0.3);border:1px solid rgba(102,126,234,0.3);border-radius:6px;padding:5px 10px;color:#fff;font-size:12px;">
+                            <option value="">全部状态</option>
+                            <option value="pending">待处理</option>
+                            <option value="running">进行中</option>
+                            <option value="completed">已完成</option>
+                            <option value="failed">失败</option>
+                        </select>
+                    </div>
+                    <div id="agentTasksList" style="max-height:400px;overflow-y:auto;">
+                        <div style="color:#666;text-align:center;padding:20px;">暂无任务</div>
+                    </div>
                 </div>
             </div>
             
@@ -478,34 +613,92 @@
             <!-- 设置面板 -->
             <div class="panel" id="settings">
                 <h2 class="panel-title">⚙️ 系统设置</h2>
-                <div class="settings-form">
-                    <!-- 模型选择 -->
-                    <div class="form-group">
-                        <label class="form-label">选择模型</label>
-                        <select class="form-input" id="modelSelect" onchange="onModelChange()">
-                            <option value="">加载中...</option>
-                        </select>
+                <div class="settings-form" style="max-width:600px;">
+                    
+                    <!-- 全局模型配置 -->
+                    <div style="background:rgba(102,126,234,0.1);border-radius:12px;padding:20px;margin-bottom:20px;">
+                        <div style="font-size:16px;font-weight:bold;color:#667eea;margin-bottom:15px;">🤖 全局 AI 模型配置</div>
+                        
+                        <!-- 模型选择 -->
+                        <div class="form-group">
+                            <label class="form-label">选择模型</label>
+                            <select class="form-input" id="modelSelect" onchange="onModelChange()">
+                                <option value="">加载中...</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 当前模型信息 -->
+                        <div id="currentModelInfo" style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;margin-bottom:15px;display:none;">
+                            <div style="font-size:12px;color:#a0aec0;">
+                                <div>API 地址: <span id="currentApiUrl" style="color:#fff;"></span></div>
+                                <div>模型: <span id="currentModel" style="color:#fff;"></span></div>
+                                <div>API Key: <span id="currentApiKey" style="color:#4ade80;">已配置</span></div>
+                            </div>
+                        </div>
+                        
+                        <!-- API 配置 -->
+                        <div class="form-group"><label class="form-label">API 地址</label><input type="text" class="form-input" id="apiUrl" placeholder="https://api.example.com/v1"></div>
+                        <div class="form-group"><label class="form-label">API Key</label><input type="password" class="form-input" id="apiKey" placeholder="sk-xxx..."></div>
+                        <div class="form-group"><label class="form-label">模型名称</label><input type="text" class="form-input" id="modelName" placeholder="gpt-4, MiniMax-M2.5..."></div>
+                        
+                        <button class="save-btn" onclick="saveSettings()" style="width:100%;">💾 保存全局配置</button>
                     </div>
                     
-                    <!-- 当前模型信息 -->
-                    <div id="currentModelInfo" style="background:rgba(102,126,234,0.1);padding:15px;border-radius:8px;margin-bottom:15px;display:none;">
-                        <div style="color:#667eea;font-weight:bold;margin-bottom:10px;">当前模型信息</div>
-                        <div style="font-size:13px;color:#a0aec0;">
-                            <div>API 地址: <span id="currentApiUrl" style="color:#fff;"></span></div>
-                            <div>模型: <span id="currentModel" style="color:#fff;"></span></div>
-                            <div>API Key: <span id="currentApiKey" style="color:#4ade80;">已配置</span></div>
+                    <!-- 子代理独立 API 配置 -->
+                    <div style="background:rgba(74,222,128,0.1);border-radius:12px;padding:20px;margin-bottom:20px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;">
+                            <div style="font-size:16px;font-weight:bold;color:#4ade80;">🤖 子代理 API 配置</div>
+                            <button onclick="loadAgentApiConfigs()" style="background:rgba(74,222,128,0.2);border:none;color:#4ade80;padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px;">🔄 刷新</button>
+                        </div>
+                        <div style="font-size:12px;color:#a0aec0;margin-bottom:15px;">为每个子代理配置独立的 API，留空则使用全局配置</div>
+                        
+                        <!-- 代理选择 -->
+                        <div class="form-group">
+                            <label class="form-label">选择代理</label>
+                            <select class="form-input" id="agentApiSelect" onchange="loadAgentApiConfig()">
+                                <option value="">-- 选择代理 --</option>
+                            </select>
+                        </div>
+                        
+                        <!-- 代理独立配置 -->
+                        <div id="agentApiConfigPanel" style="display:none;">
+                            <div style="background:rgba(0,0,0,0.3);padding:15px;border-radius:8px;margin-bottom:15px;">
+                                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                                    <span id="selectedAgentIcon" style="font-size:24px;">🤖</span>
+                                    <div>
+                                        <div id="selectedAgentName" style="font-weight:bold;"></div>
+                                        <div id="selectedAgentRole" style="font-size:12px;color:#a0aec0;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label" style="display:flex;align-items:center;gap:8px;">
+                                    <input type="checkbox" id="agentUseGlobalApi" onchange="toggleAgentApiFields()" style="width:16px;height:16px;">
+                                    使用全局 API 配置
+                                </label>
+                            </div>
+                            
+                            <div id="agentApiFields">
+                                <div class="form-group"><label class="form-label">代理专属 API 地址</label><input type="text" class="form-input" id="agentApiUrl" placeholder="留空使用全局配置"></div>
+                                <div class="form-group"><label class="form-label">代理专属 API Key</label><input type="password" class="form-input" id="agentApiKey" placeholder="留空使用全局配置"></div>
+                                <div class="form-group"><label class="form-label">代理专属模型</label><input type="text" class="form-input" id="agentModelName" placeholder="留空使用全局配置"></div>
+                            </div>
+                            
+                            <button class="save-btn" onclick="saveAgentApiConfig()" style="width:100%;background:linear-gradient(135deg,#4ade80,#22c55e);">💾 保存代理配置</button>
                         </div>
                     </div>
                     
-                    <!-- API 配置 -->
-                    <div class="form-group"><label class="form-label">API 地址</label><input type="text" class="form-input" id="apiUrl" placeholder="https://api.example.com/v1"></div>
-                    <div class="form-group"><label class="form-label">API Key</label><input type="password" class="form-input" id="apiKey" placeholder="sk-xxx..."></div>
-                    <div class="form-group"><label class="form-label">模型名称</label><input type="text" class="form-input" id="modelName" placeholder="gpt-4, MiniMax-M2.5..."></div>
-                    
-                    <button class="save-btn" onclick="saveSettings()">💾 保存并应用</button>
+                    <!-- 代理 API 配置列表 -->
+                    <div style="background:rgba(251,191,36,0.1);border-radius:12px;padding:20px;margin-bottom:20px;">
+                        <div style="font-size:16px;font-weight:bold;color:#fbbf24;margin-bottom:15px;">📋 已配置的代理列表</div>
+                        <div id="agentApiList" style="max-height:300px;overflow-y:auto;">
+                            <div style="color:#666;text-align:center;padding:20px;">加载中...</div>
+                        </div>
+                    </div>
                     
                     <!-- 添加自定义模型 -->
-                    <div style="margin-top:25px;padding-top:20px;border-top:1px solid rgba(102,126,234,0.2);">
+                    <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:20px;">
                         <div style="color:#667eea;font-weight:bold;margin-bottom:15px;">➕ 添加自定义模型</div>
                         <div class="form-group"><label class="form-label">模型名称</label><input type="text" class="form-input" id="customModelName" placeholder="如: GPT-4、Claude-3"></div>
                         <div class="form-group"><label class="form-label">API 地址</label><input type="text" class="form-input" id="customApiUrl" placeholder="https://api.example.com/v1"></div>
@@ -689,6 +882,11 @@
         
         // 全局切换面板函数
         window.switchTo = function(panelId) {
+            // 停止状态监控
+            if (typeof stopStatusMonitoring === 'function') {
+                stopStatusMonitoring();
+            }
+            
             document.querySelectorAll('.nav-item').forEach(function(i){i.classList.remove('active')});
             document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('active')});
             var nav = document.querySelector('[data-panel="' + panelId + '"]');
@@ -712,32 +910,113 @@
             if (panelId === 'local') loadLocalStatus(); if (panelId === 'channels') loadChannels();
         }
         let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+        let currentConversationId = null;  // 当前对话ID
+        let conversationsList = [];  // 对话列表
+        
+        // 页面加载时从后端加载对话列表
+        async function initConversations() {
+            try {
+                const resp = await fetch(API_BASE + '/api/conversations');
+                const data = await resp.json();
+                conversationsList = data.conversations || [];
+                
+                // 如果有对话，加载最近的
+                if (conversationsList.length > 0) {
+                    // 检查 localStorage 中是否有当前对话ID
+                    const savedConvId = localStorage.getItem('currentConversationId');
+                    if (savedConvId && conversationsList.find(c => c.id == savedConvId)) {
+                        await loadConversation(savedConvId);
+                    } else {
+                        // 加载最新的对话
+                        await loadConversation(conversationsList[0].id);
+                    }
+                } else {
+                    showWelcomeMessage();
+                }
+            } catch (e) {
+                console.error('加载对话列表失败:', e);
+                showWelcomeMessage();
+            }
+        }
+        
+        function showWelcomeMessage() {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = '<div class="message ai"><div class="message-content">你好！我是<strong>玄灵AI</strong> 🧚<br><br>我可以帮助你：<br>• 智能对话和问答<br>• 管理项目<br>• 记忆重要信息<br>• 执行各种任务<br><br>有什么可以帮你的吗？</div></div>';
+        }
+        
+        // 加载对话历史（从后端）
+        async function loadConversation(convId) {
+            try {
+                const resp = await fetch(API_BASE + '/api/conversations/' + convId);
+                const conv = await resp.json();
+                
+                currentConversationId = convId;
+                localStorage.setItem('currentConversationId', convId);
+                
+                const messagesDiv = document.getElementById('messages');
+                messagesDiv.innerHTML = '';
+                
+                const messages = conv.messages || [];
+                if (messages.length === 0) {
+                    showWelcomeMessage();
+                    return;
+                }
+                
+                messages.forEach(msg => {
+                    const type = msg.role === 'user' ? 'user' : 'ai';
+                    const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+                    addMessage(msg.content, type, time);
+                });
+                
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            } catch (e) {
+                console.error('加载对话失败:', e);
+                showWelcomeMessage();
+            }
+        }
+        
+        // 创建新对话
+        async function createNewConversation() {
+            try {
+                const resp = await fetch(API_BASE + '/api/conversations', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({})
+                });
+                const data = await resp.json();
+                currentConversationId = data.conversation.id;
+                localStorage.setItem('currentConversationId', currentConversationId);
+                
+                // 刷新对话列表
+                await initConversations();
+                
+                return data.conversation;
+            } catch (e) {
+                console.error('创建对话失败:', e);
+                return null;
+            }
+        }
+        
+        // 保存消息到后端
+        async function saveMessageToBackend(role, content) {
+            if (!currentConversationId) {
+                await createNewConversation();
+            }
+            
+            try {
+                await fetch(API_BASE + '/api/conversations/' + currentConversationId + '/messages', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({role, content})
+                });
+            } catch (e) {
+                console.error('保存消息失败:', e);
+            }
+        }
         
         // 页面加载时恢复聊天历史
         function loadChatHistory() {
-            const messagesDiv = document.getElementById('messages');
-            if (!messagesDiv) return;
-            
-            if (chatHistory.length === 0) {
-                // 首次访问，显示欢迎消息
-                messagesDiv.innerHTML = '<div class="message ai"><div class="message-content">你好！我是<strong>玄灵AI</strong> 🧚<br><br>我可以帮助你：<br>• 智能对话和问答<br>• 管理项目<br>• 记忆重要信息<br>• 执行各种任务<br><br>有什么可以帮你的吗？</div></div>';
-                return;
-            }
-            
-            // 恢复历史消息
-            let html = '';
-            chatHistory.forEach(h => {
-                if (h.user) {
-                    html += '<div class="message user"><div class="message-content">' + 
-                        (h.user || '').replace(/\n/g, '<br>') + '</div></div>';
-                }
-                if (h.ai) {
-                    html += '<div class="message ai"><div class="message-content">' + 
-                        (h.ai || '').replace(/\n/g, '<br>') + '</div></div>';
-                }
-            });
-            messagesDiv.innerHTML = html;
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            initConversations();
         }
         
         // 检查API连接状态
@@ -806,13 +1085,23 @@
             const message = input.value.trim();
             if (!message) return;
             
+            // 如果没有当前对话，创建一个新的
+            if (!currentConversationId) {
+                await createNewConversation();
+            }
+            
             addMessage(message, 'user', new Date().toLocaleTimeString());
+            
+            // 保存用户消息到后端
+            await saveMessageToBackend('user', message);
+            
             input.value = '';
             btn.disabled = true;
             
             const loadingId = addMessage('正在思考...', 'ai', '');
             
             try {
+                // 使用简单的 JSON API
                 const resp = await fetch(API_BASE + '/api/chat/json', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -821,16 +1110,18 @@
                 const data = await resp.json();
                 document.getElementById(loadingId)?.remove();
                 
-                // 安全处理返回消息
-                const replyMessage = data.message || data.error || '抱歉，没有收到有效回复';
+                // 处理返回消息
+                const replyMessage = data.message || data.error || '未收到回复';
                 addMessage(replyMessage, 'ai', new Date().toLocaleTimeString());
                 
-                // 保存到历史
-                chatHistory.push({user: message, ai: replyMessage, time: new Date().toISOString()});
-                localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
+                // 保存AI回复到后端
+                await saveMessageToBackend('assistant', replyMessage);
+                
+                // 刷新对话列表
+                renderHistory();
             } catch (e) {
                 document.getElementById(loadingId)?.remove();
-                addMessage('抱歉，出了点问题: ' + e.message, 'ai', new Date().toLocaleTimeString());
+                addMessage('请求失败: ' + e.message, 'ai', new Date().toLocaleTimeString());
             }
             
             btn.disabled = false;
@@ -852,9 +1143,11 @@
         
         function handleKeyPress(e) { if (e.key === 'Enter') sendMessage(); }
         
-        // 清空对话
+        // 清空对话（本地显示）
         function clearChat() {
             document.getElementById('messages').innerHTML = '<div class="message ai"><div class="message-content">对话已清空</div></div>';
+            currentConversationId = null;
+            localStorage.removeItem('currentConversationId');
         }
         
         // 切换历史面板
@@ -863,60 +1156,91 @@
             renderHistory();
         }
         
-        function renderHistory(filter = '') {
+        // 渲染历史列表（从后端获取）
+        async function renderHistory(filter = '') {
             const list = document.getElementById('historyList');
-            let filtered = chatHistory;
             
-            // 搜索过滤
-            if (filter) {
-                const lowerFilter = filter.toLowerCase();
-                filtered = chatHistory.filter(h => 
-                    h.user.toLowerCase().includes(lowerFilter) || 
-                    (h.ai && h.ai.toLowerCase().includes(lowerFilter))
-                );
+            try {
+                const resp = await fetch(API_BASE + '/api/conversations');
+                const data = await resp.json();
+                conversationsList = data.conversations || [];
+                
+                let filtered = conversationsList;
+                
+                // 搜索过滤
+                if (filter) {
+                    const lowerFilter = filter.toLowerCase();
+                    filtered = conversationsList.filter(c => 
+                        c.title.toLowerCase().includes(lowerFilter) || 
+                        (c.preview && c.preview.toLowerCase().includes(lowerFilter))
+                    );
+                }
+                
+                if (filtered.length === 0) {
+                    list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">暂无历史记录<br><br><button onclick="createNewConversation()" style="background:rgba(102,126,234,0.3);border:none;color:#667eea;padding:8px 16px;border-radius:6px;cursor:pointer;">+ 新对话</button></div>';
+                    return;
+                }
+                
+                // 显示对话列表
+                list.innerHTML = filtered.map(conv => 
+                    '<div class="history-item' + (conv.id == currentConversationId ? '" style="background:rgba(102,126,234,0.3);' : '"') + ' onclick="loadConversation(\'' + conv.id + '\')">' +
+                    '<div class="history-item-title">' + (conv.title || '未命名对话').substring(0, 25) + '</div>' +
+                    '<div class="history-item-time">' + (conv.updated_at ? new Date(conv.updated_at).toLocaleString() : '') + 
+                    ' <span onclick="deleteHistoryItem(event, \'' + conv.id + '\')" style="color:#ef4444;cursor:pointer;margin-left:10px;">🗑️</span></div></div>'
+                ).join('') + '<div style="text-align:center;margin-top:10px;"><button onclick="createNewConversation()" style="background:rgba(102,126,234,0.3);border:none;color:#667eea;padding:8px 16px;border-radius:6px;cursor:pointer;">+ 新对话</button></div>';
+                
+            } catch (e) {
+                list.innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">加载失败: ' + e.message + '</div>';
             }
-            
-            if (filtered.length === 0) {
-                list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">暂无历史记录</div>';
-                return;
-            }
-            
-            // 显示最近20条（包含删除按钮）
-            list.innerHTML = filtered.slice(-20).reverse().map((h, i) => {
-                const realIndex = chatHistory.indexOf(h);
-                return '<div class="history-item" onclick="loadHistory(' + realIndex + ')"><div class="history-item-title">' + 
-                    h.user.substring(0, 25) + (h.user.length > 25 ? '...' : '') + '</div>' +
-                    '<div class="history-item-time">' + new Date(h.time).toLocaleString() + 
-                    ' <span onclick="deleteHistoryItem(event, ' + realIndex + ')" style="color:#ef4444;cursor:pointer;margin-left:10px;">🗑️</span></div></div>';
-            }).join('');
-        }
-        
-        function loadHistory(index) {
-            const h = chatHistory[index];
-            if (!h) return;
-            document.getElementById('messages').innerHTML = '<div class="message user"><div class="message-content">' + 
-                (h.user || '').replace(/\n/g, '<br>') + '</div></div><div class="message ai"><div class="message-content">' + 
-                (h.ai || '').replace(/\n/g, '<br>') + '</div></div>';
-            document.getElementById('messages').scrollTop = document.getElementById('messages').scrollHeight;
         }
         
         function searchHistory(query) {
             renderHistory(query);
         }
         
-        function deleteHistoryItem(event, index) {
+        // 删除对话
+        async function deleteHistoryItem(event, convId) {
             event.stopPropagation();
             if (!confirm('确定删除这条对话？')) return;
-            chatHistory.splice(index, 1);
-            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-            renderHistory(document.getElementById('historySearch')?.value || '');
+            
+            try {
+                await fetch(API_BASE + '/api/conversations/' + convId, { method: 'DELETE' });
+                
+                // 如果删除的是当前对话，清空显示
+                if (convId == currentConversationId) {
+                    currentConversationId = null;
+                    localStorage.removeItem('currentConversationId');
+                    showWelcomeMessage();
+                }
+                
+                renderHistory(document.getElementById('historySearch')?.value || '');
+            } catch (e) {
+                alert('删除失败: ' + e.message);
+            }
         }
         
-        function clearAllHistory() {
+        // 清空所有历史
+        async function clearAllHistory() {
             if (!confirm('确定清空所有对话历史？此操作不可恢复！')) return;
-            chatHistory = [];
-            localStorage.setItem('chatHistory', JSON.stringify(chatHistory));
-            renderHistory();
+            
+            try {
+                // 逐个删除所有对话
+                for (const conv of conversationsList) {
+                    await fetch(API_BASE + '/api/conversations/' + conv.id, { method: 'DELETE' });
+                }
+                
+                currentConversationId = null;
+                localStorage.removeItem('currentConversationId');
+                showWelcomeMessage();
+                renderHistory();
+            } catch (e) {
+                alert('清空失败: ' + e.message);
+            }
+        }
+        
+        // 兼容旧函数名
+        function loadHistory(index) {
+            // 已废弃，使用 loadConversation
         }
         
         // 项目
@@ -1126,7 +1450,7 @@ let currentEditingFile = null;
                     });
                 } else {
                     // 数据库项目
-                    await fetch(API_BASE + '/projects/' + currentProjectId, {
+                    await fetch(API_BASE + '/api/projects/' + currentProjectId, {
                         method: 'PUT',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({description: desc, status: status})
@@ -1147,7 +1471,7 @@ let currentEditingFile = null;
                 if (isFileProject) {
                     await fetch(API_BASE + '/project-manager/projects/' + currentProjectId, { method: 'DELETE' });
                 } else {
-                    await fetch(API_BASE + '/projects/' + currentProjectId, { method: 'DELETE' });
+                    await fetch(API_BASE + '/api/projects/' + currentProjectId, { method: 'DELETE' });
                 }
                 closeProjectDetail();
                 loadProjects();
@@ -1163,7 +1487,7 @@ let currentEditingFile = null;
             if (!name) return;
             
             try {
-                await fetch(API_BASE + '/projects', {
+                await fetch(API_BASE + '/api/projects', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({name, description: desc})
@@ -1175,92 +1499,501 @@ let currentEditingFile = null;
             } catch (e) { alert('添加失败: ' + e.message); }
         }
         
-        // ============ 子代理管理 ============
+        // ============ 子代理管理 (深度重构版) ============
         let allAgents = [];
         let currentAgentId = null;
         
         async function loadAgents() {
             try {
-                const resp = await fetch(API_BASE + '/agents');
+                const resp = await fetch(API_BASE + '/api/agents');
                 const data = await resp.json();
                 allAgents = data.agents || [];
                 const grid = document.getElementById('agentsGrid');
                 
+                // 更新统计
+                updateAgentStats();
+                
                 if (allAgents.length === 0) {
-                    grid.innerHTML = '<div style="color:#666;padding:40px;text-align:center;">暂无子代理<br><br><button onclick="showAddAgent()" style="background:rgba(102,126,234,0.3);border:none;color:#667eea;padding:10px 20px;border-radius:6px;cursor:pointer;">➕ 创建第一个子代理</button></div>';
+                    grid.innerHTML = '<div style="color:#666;padding:40px;text-align:center;grid-column:1/-1;">暂无代理<br><br><small>选择代理类型后点击"创建代理"</small></div>';
                     return;
                 }
                 
                 grid.innerHTML = allAgents.map(a => {
-                    const statusColor = a.status === 'running' ? '#4ade80' : a.status === 'error' ? '#ef4444' : '#a0aec0';
-                    const statusText = a.status === 'running' ? '运行中' : a.status === 'error' ? '错误' : '空闲';
-                    return '<div class="project-card" data-agent-id="' + a.id + '" onclick="showAgentDetail(' + a.id + ')">' +
-                        '<div class="project-icon">🤖</div>' +
+                    const statusColors = {
+                        'idle': {'bg': 'rgba(160,174,192,0.2)', 'color': '#a0aec0', 'text': '空闲'},
+                        'running': {'bg': 'rgba(74,222,128,0.2)', 'color': '#4ade80', 'text': '运行中'},
+                        'paused': {'bg': 'rgba(251,191,36,0.2)', 'color': '#fbbf24', 'text': '已暂停'},
+                        'error': {'bg': 'rgba(239,68,68,0.2)', 'color': '#ef4444', 'text': '错误'},
+                        'stopped': {'bg': 'rgba(113,128,150,0.2)', 'color': '#718096', 'text': '已停止'}
+                    };
+                    const s = statusColors[a.status] || statusColors['idle'];
+                    const stats = a.stats || {};
+                    const skills = a.skills || [];
+                    
+                    return '<div class="agent-card" onclick="showAgentDetail(\'' + a.id + '\')">' +
+                        '<div style="display:flex;justify-content:space-between;align-items:start;">' +
+                        '<div><div class="project-icon">' + (a.icon || '🤖') + '</div>' +
                         '<div class="project-name">' + a.name + '</div>' +
-                        '<div class="project-desc">' + (a.description || '暂无描述') + '</div>' +
-                        '<div class="project-status" style="background:' + statusColor + '20;color:' + statusColor + ';">' + statusText + '</div>' +
-                        '<div style="margin-top:10px;font-size:12px;color:#666;">任务: ' + (a.tasks_count || 0) + ' | 成功率: ' + Math.round((a.success_rate || 0) * 100) + '%</div>' +
-                        '</div>';
-                }).join('') + '<div class="add-card" onclick="showAddAgent()"><span>+</span><p>添加子代理</p></div>';
+                        '<div class="project-desc">' + (a.description || '暂无描述').substring(0, 30) + '</div></div>' +
+                        '<div style="background:' + s.bg + ';color:' + s.color + ';padding:4px 10px;border-radius:12px;font-size:11px;">' + s.text + '</div>' +
+                        '</div>' +
+                        '<div style="margin-top:10px;display:flex;gap:5px;flex-wrap:wrap;">' +
+                        skills.slice(0, 3).map(sk => '<span style="background:rgba(102,126,234,0.1);color:#667eea;padding:2px 8px;border-radius:10px;font-size:10px;">' + sk + '</span>').join('') +
+                        '</div>' +
+                        '<div style="margin-top:10px;font-size:12px;color:#666;display:flex;justify-content:space-between;">' +
+                        '<span>任务: ' + (stats.total_tasks || 0) + '</span>' +
+                        '<span style="color:#4ade80;">✓ ' + (stats.success_rate || 100) + '%</span>' +
+                        '</div></div>';
+                }).join('');
             } catch (e) {
                 console.error(e);
-                document.getElementById('agentsGrid').innerHTML = '<div style="color:#ef4444;padding:20px;">无法加载子代理</div>';
+                document.getElementById('agentsGrid').innerHTML = '<div style="color:#ef4444;padding:20px;text-align:center;grid-column:1/-1;">加载失败: ' + e.message + '</div>';
             }
         }
         
-        function showAddAgent() {
-            const name = prompt('子代理名称:');
-            if (!name) return;
-            const desc = prompt('子代理描述:') || '';
+        function updateAgentStats() {
+            const stats = {
+                total: allAgents.length,
+                active: allAgents.filter(a => a.status === 'running').length,
+                tasks: allAgents.reduce((sum, a) => sum + ((a.stats || {}).total_tasks || 0), 0),
+                failed: allAgents.reduce((sum, a) => sum + ((a.stats || {}).failed_tasks || 0), 0)
+            };
             
-            fetch(API_BASE + '/agents', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({name, description: desc})
-            }).then(r => r.json()).then(data => {
+            const el = document.getElementById('statsTotalAgents');
+            if (el) el.textContent = stats.total;
+            const el2 = document.getElementById('statsActiveAgents');
+            if (el2) el2.textContent = stats.active;
+            const el3 = document.getElementById('statsTotalTasks');
+            if (el3) el3.textContent = stats.tasks;
+            const el4 = document.getElementById('statsFailedTasks');
+            if (el4) el4.textContent = stats.failed;
+        }
+        
+        async function showAddAgent() {
+            const template = document.getElementById('agentTemplateSelect')?.value || 'worker';
+            const templates = {
+                'worker': {'icon': '⚙️', 'desc': '执行具体任务，如文件操作、数据处理'},
+                'planner': {'icon': '📋', 'desc': '分析复杂目标，分解为可执行的子任务'},
+                'reviewer': {'icon': '🔍', 'desc': '检查任务结果，确保质量达标'},
+                'coordinator': {'icon': '🎭', 'desc': '管理多代理协作，聚合结果'},
+                'coder': {'icon': '💻', 'desc': '编写、修改、调试代码'},
+                'researcher': {'icon': '🔬', 'desc': '搜索资料、分析信息'},
+                'writer': {'icon': '✍️', 'desc': '生成文档、报告、文章'}
+            };
+            
+            const t = templates[template] || templates['worker'];
+            const name = prompt('代理名称:', t.icon + ' 新代理');
+            if (!name) return;
+            
+            try {
+                const resp = await fetch(API_BASE + '/api/agents', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        name: name,
+                        role: template,
+                        description: t.desc,
+                        template: template
+                    })
+                });
+                const data = await resp.json();
+                
                 if (data.status === 'ok') {
-                    alert('✅ 子代理创建成功！');
+                    alert('✅ 代理创建成功！');
                     loadAgents();
                 } else {
-                    alert('❌ 创建失败: ' + (data.message || ''));
+                    alert('❌ 创建失败: ' + (data.detail || JSON.stringify(data)));
                 }
-            }).catch(e => alert('❌ 创建失败: ' + e.message));
+            } catch (e) {
+                alert('❌ 创建失败: ' + e.message);
+            }
         }
         
         async function showAgentDetail(agentId) {
             currentAgentId = agentId;
-            const agent = allAgents.find(a => a.id === agentId);
-            if (!agent) return;
             
-            document.getElementById('agentDetailTitle').textContent = '🤖 ' + agent.name;
-            document.getElementById('agentDetailDesc').value = agent.description || '';
-            document.getElementById('agentDetailStatus').value = agent.status || 'idle';
-            document.getElementById('agentTasksCount').textContent = agent.tasks_count || 0;
-            document.getElementById('agentSuccessRate').textContent = Math.round((agent.success_rate || 0) * 100) + '%';
-            
-            // 加载记忆和任务
-            loadAgentMemories(agentId);
-            loadAgentTasks(agentId);
-            
-            document.getElementById('agentDetailModal').classList.add('show');
+            try {
+                const resp = await fetch(API_BASE + '/api/agents/' + agentId);
+                const data = await resp.json();
+                const agent = data.agent || {};
+                const stats = agent.stats || {};
+                
+                document.getElementById('agentDetailIcon').textContent = agent.icon || '🤖';
+                document.getElementById('agentDetailName').textContent = agent.name;
+                document.getElementById('agentDetailDesc').textContent = agent.description || '暂无描述';
+                document.getElementById('agentDetailSuccessRate').textContent = (stats.success_rate || 100) + '%';
+                
+                // 技能标签
+                const skills = agent.skills || [];
+                document.getElementById('agentDetailSkills').innerHTML = skills.map(s => 
+                    '<span style="background:rgba(102,126,234,0.2);color:#667eea;padding:4px 12px;border-radius:12px;font-size:12px;">' + s + '</span>'
+                ).join('') || '<span style="color:#666;">暂无技能</span>';
+                
+                // 统计信息
+                document.getElementById('agentDetailStats').innerHTML = 
+                    '<span style="background:rgba(102,126,234,0.2);padding:4px 12px;border-radius:15px;font-size:12px;color:#667eea;">📊 总任务: ' + (stats.total_tasks || 0) + '</span>' +
+                    '<span style="background:rgba(74,222,128,0.2);padding:4px 12px;border-radius:15px;font-size:12px;color:#4ade80;">✅ 完成: ' + (stats.completed_tasks || 0) + '</span>' +
+                    '<span style="background:rgba(239,68,68,0.2);padding:4px 12px;border-radius:15px;font-size:12px;color:#ef4444;">❌ 失败: ' + (stats.failed_tasks || 0) + '</span>';
+                
+                // 控制按钮
+                const status = agent.status || 'idle';
+                let controlBtns = '';
+                if (status === 'idle' || status === 'stopped') {
+                    controlBtns = '<button onclick="controlAgent(\'start\')" style="background:rgba(74,222,128,0.2);border:1px solid #4ade80;color:#4ade80;padding:8px 15px;border-radius:6px;cursor:pointer;margin-right:5px;">▶️ 启动</button>';
+                } else if (status === 'running') {
+                    controlBtns = '<button onclick="controlAgent(\'pause\')" style="background:rgba(251,191,36,0.2);border:1px solid #fbbf24;color:#fbbf24;padding:8px 15px;border-radius:6px;cursor:pointer;margin-right:5px;">⏸️ 暂停</button>';
+                } else if (status === 'paused') {
+                    controlBtns = '<button onclick="controlAgent(\'start\')" style="background:rgba(74,222,128,0.2);border:1px solid #4ade80;color:#4ade80;padding:8px 15px;border-radius:6px;cursor:pointer;margin-right:5px;">▶️ 继续</button>';
+                }
+                controlBtns += '<button onclick="controlAgent(\'stop\')" style="background:rgba(239,68,68,0.2);border:1px solid #ef4444;color:#ef4444;padding:8px 15px;border-radius:6px;cursor:pointer;margin-right:5px;">⏹️ 停止</button>';
+                controlBtns += '<button onclick="deleteAgent(\'' + agentId + '\')" style="background:rgba(239,68,68,0.2);border:none;color:#ef4444;padding:8px 15px;border-radius:6px;cursor:pointer;">🗑️ 删除</button>';
+                document.getElementById('agentControlBtns').innerHTML = controlBtns;
+                
+                // 加载任务列表
+                loadAgentTasks();
+                
+                // 加载代理记忆
+                loadAgentMemoryList();
+                
+                // 启动状态监控
+                startStatusMonitoring();
+                
+                // 切换到详情面板
+                switchTo('agentDetail');
+                
+            } catch (e) {
+                alert('加载代理失败: ' + e.message);
+            }
         }
         
-        async function loadAgentMemories(agentId) {
-            const list = document.getElementById('agentMemoriesList');
+        async function loadAgentTasks() {
+            if (!currentAgentId) return;
+            
+            const filter = document.getElementById('agentTaskFilter')?.value || '';
+            const list = document.getElementById('agentTasksList');
+            
             try {
-                const resp = await fetch(API_BASE + '/agents/' + agentId + '/memory');
-                const data = await resp.json();
-                const memories = data.memories || {};
+                let url = API_BASE + '/api/agents/' + currentAgentId + '/tasks';
+                if (filter) url += '?status=' + filter;
                 
-                if (Object.keys(memories).length === 0) {
-                    list.innerHTML = '<div style="color:#666;padding:10px;">暂无记忆</div>';
+                const resp = await fetch(url);
+                const data = await resp.json();
+                const tasks = data.tasks || [];
+                
+                if (tasks.length === 0) {
+                    list.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">暂无任务</div>';
                     return;
                 }
                 
-                list.innerHTML = Object.values(memories).map(m => 
-                    '<div style="padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:5px;">' +
-                    '<div style="font-weight:bold;font-size:12px;">' + (m.title || '无标题') + '</div>' +
-                    '<div style="font-size:11px;color:#a0aec0;">' + (m.content || '').substring(0, 50) + '</div>' +
+                const statusColors = {
+                    'pending': {'bg': '#a0aec0', 'text': '待处理', 'canRun': true},
+                    'running': {'bg': '#4ade80', 'text': '进行中', 'canRun': false},
+                    'completed': {'bg': '#667eea', 'text': '已完成', 'canRun': false},
+                    'failed': {'bg': '#ef4444', 'text': '失败', 'canRun': true},
+                    'cancelled': {'bg': '#718096', 'text': '已取消', 'canRun': true}
+                };
+                
+                list.innerHTML = tasks.map(t => {
+                    const s = statusColors[t.status] || statusColors['pending'];
+                    const progress = Math.round((t.progress || 0) * 100);
+                    const isRunning = t.status === 'running';
+                    const progressAnimation = isRunning ? 'animation: pulse 1s infinite;' : '';
+                    
+                    let actionBtns = '';
+                    if (s.canRun) {
+                        actionBtns = '<button onclick="executeTask(\'' + t.id + '\')" style="background:rgba(74,222,128,0.2);border:none;color:#4ade80;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:5px;">▶ 执行</button>';
+                    }
+                    if (t.status === 'completed' && t.result) {
+                        actionBtns += '<button onclick="showTaskResult(\'' + t.id + '\')" style="background:rgba(102,126,234,0.2);border:none;color:#667eea;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;margin-right:5px;">📄 结果</button>';
+                    }
+                    actionBtns += '<button onclick="deleteTask(\'' + t.id + '\')" style="background:rgba(239,68,68,0.1);border:none;color:#ef4444;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;">🗑</button>';
+                    
+                    return '<div style="padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;margin-bottom:8px;' + (isRunning ? 'border:1px solid #4ade80;' : '') + '">' +
+                        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                        '<div style="font-weight:bold;flex:1;">' + t.title + '</div>' +
+                        '<span style="background:' + s.bg + '20;color:' + s.bg + ';padding:2px 8px;border-radius:10px;font-size:11px;">' + s.text + '</span>' +
+                        '</div>' +
+                        '<div style="font-size:12px;color:#a0aec0;margin-bottom:8px;">' + (t.description || t.goal || '').substring(0, 80) + '</div>' +
+                        '<div style="background:rgba(0,0,0,0.3);border-radius:4px;height:6px;overflow:hidden;margin-bottom:8px;">' +
+                        '<div id="progress-' + t.id + '" style="background:linear-gradient(90deg,#667eea,#764ba2);height:100%;width:' + progress + '%;' + progressAnimation + '"></div>' +
+                        '</div>' +
+                        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                        '<div style="font-size:11px;color:#666;">' + (t.created_at ? new Date(t.created_at).toLocaleString() : '') + ' · ' + progress + '%</div>' +
+                        '<div>' + actionBtns + '</div>' +
+                        '</div>' +
+                        '</div>';
+                }).join('');
+                
+                // 添加动画样式
+                if (!document.getElementById('pulse-animation')) {
+                    document.head.insertAdjacentHTML('beforeend', '<style id="pulse-animation">@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}</style>');
+                }
+                
+            } catch (e) {
+                list.innerHTML = '<div style="color:#ef4444;padding:20px;">加载失败: ' + e.message + '</div>';
+            }
+        }
+        
+        // 执行任务
+        async function executeTask(taskId) {
+            if (!confirm('确定要执行此任务吗？')) return;
+            
+            try {
+                const resp = await fetch(API_BASE + '/api/agent-tasks/' + taskId + '/execute', {
+                    method: 'POST'
+                });
+                const data = await resp.json();
+                
+                if (data.success) {
+                    alert('✅ 任务执行完成！');
+                    loadAgentTasks();
+                    loadAgents();
+                } else {
+                    alert('❌ 执行失败: ' + (data.error || JSON.stringify(data)));
+                }
+            } catch (e) {
+                alert('❌ 执行失败: ' + e.message);
+            }
+        }
+        
+        // 显示任务结果
+        async function showTaskResult(taskId) {
+            try {
+                const resp = await fetch(API_BASE + '/api/agent-tasks/' + taskId);
+                const task = await resp.json();
+                
+                const result = task.result || {};
+                const logs = await (await fetch(API_BASE + '/api/agent-tasks/' + taskId + '/logs')).json();
+                
+                let content = '📋 任务: ' + task.title + '\n\n';
+                content += '📊 状态: ' + task.status + '\n';
+                content += '⏱️ 开始: ' + (task.started_at || '未开始') + '\n';
+                content += '✅ 完成: ' + (task.completed_at || '未完成') + '\n\n';
+                content += '📝 结果摘要:\n' + (result.summary || '无') + '\n\n';
+                content += '📋 执行日志:\n';
+                logs.logs.forEach(log => {
+                    content += `  [${log.step || log.message}] ${Math.round(log.progress * 100)}%\n`;
+                });
+                
+                alert(content);
+            } catch (e) {
+                alert('获取结果失败: ' + e.message);
+            }
+        }
+        
+        // 删除任务
+        async function deleteTask(taskId) {
+            if (!confirm('确定要删除此任务吗？')) return;
+            
+            try {
+                await fetch(API_BASE + '/api/agent-tasks/' + taskId, { method: 'DELETE' });
+                loadAgentTasks();
+                loadAgents();
+            } catch (e) {
+                alert('删除失败: ' + e.message);
+            }
+        }
+        
+        // 实时状态监控（轮询）
+        let statusCheckInterval = null;
+        
+        function startStatusMonitoring() {
+            if (statusCheckInterval) clearInterval(statusCheckInterval);
+            
+            statusCheckInterval = setInterval(async () => {
+                if (!currentAgentId) return;
+                
+                try {
+                    const resp = await fetch(API_BASE + '/api/agents/' + currentAgentId + '/realtime');
+                    const data = await resp.json();
+                    
+                    // 更新正在运行的任务进度
+                    data.current_tasks.forEach(task => {
+                        const progressEl = document.getElementById('progress-' + task.id);
+                        if (progressEl) {
+                            progressEl.style.width = Math.round(task.progress * 100) + '%';
+                        }
+                    });
+                    
+                    // 如果有任务在运行，刷新列表
+                    if (data.current_tasks.some(t => t.status === 'running')) {
+                        // 每隔3秒刷新一次任务列表
+                        if (Date.now() % 3000 < 1000) {
+                            loadAgentTasks();
+                        }
+                    }
+                } catch (e) {
+                    console.error('状态监控失败:', e);
+                }
+            }, 1000);
+        }
+        
+        function stopStatusMonitoring() {
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+                statusCheckInterval = null;
+            }
+        }
+        
+        async function assignQuickTask() {
+            const input = document.getElementById('quickTaskInput');
+            const priority = document.getElementById('quickTaskPriority').value;
+            const title = input.value.trim();
+            
+            if (!title) { alert('请输入任务描述'); return; }
+            if (!currentAgentId) { alert('请先选择代理'); return; }
+            
+            try {
+                const resp = await fetch(API_BASE + '/api/agents/' + currentAgentId + '/tasks', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ title, description: title, goal: title, priority: parseInt(priority) })
+                });
+                const data = await resp.json();
+                
+                if (data.status === 'ok') {
+                    input.value = '';
+                    alert('✅ 任务已分配！');
+                    loadAgentTasks();
+                    loadAgents();
+                } else {
+                    alert('❌ 分配失败: ' + (data.detail || JSON.stringify(data)));
+                }
+            } catch (e) {
+                alert('❌ 分配失败: ' + e.message);
+            }
+        }
+        
+        async function controlAgent(action) {
+            if (!currentAgentId) return;
+            
+            try {
+                const resp = await fetch(API_BASE + '/api/agents/' + currentAgentId + '/' + action, { method: 'POST' });
+                const data = await resp.json();
+                
+                if (data.status === 'ok') {
+                    alert('✅ ' + data.message);
+                    showAgentDetail(currentAgentId);
+                    loadAgents();
+                } else {
+                    alert('❌ 操作失败: ' + (data.detail || JSON.stringify(data)));
+                }
+            } catch (e) {
+                alert('❌ 操作失败: ' + e.message);
+            }
+        }
+        
+        async function deleteAgent(agentId) {
+            if (!confirm('⚠️ 确定要删除这个代理吗？\n\n此操作将删除该代理及其所有任务数据！')) return;
+            
+            try {
+                const resp = await fetch(API_BASE + '/api/agents/' + agentId, { method: 'DELETE' });
+                const data = await resp.json();
+                
+                if (data.status === 'ok') {
+                    alert('✅ 代理已删除');
+                    currentAgentId = null;
+                    switchTo('agents');
+                    loadAgents();
+                } else {
+                    alert('❌ 删除失败: ' + (data.detail || JSON.stringify(data)));
+                }
+            } catch (e) {
+                alert('❌ 删除失败: ' + e.message);
+            }
+        }
+        
+        // ============== 代理编辑功能 ==============
+        
+        async function toggleEditAgent() {
+            const panel = document.getElementById('agentEditPanel');
+            if (panel.style.display === 'none') {
+                // 加载当前代理数据到编辑表单
+                const resp = await fetch(API_BASE + '/api/agents/' + currentAgentId);
+                const data = await resp.json();
+                const agent = data.agent || {};
+                
+                document.getElementById('editAgentName').value = agent.name || '';
+                document.getElementById('editAgentDesc').value = agent.description || '';
+                document.getElementById('editAgentSkills').value = (agent.skills || []).join(', ');
+                document.getElementById('editAgentPrompt').value = agent.system_prompt || '';
+                
+                panel.style.display = 'block';
+                document.getElementById('editAgentBtn').textContent = '❌ 取消编辑';
+                document.getElementById('editAgentBtn').style.background = 'rgba(239,68,68,0.2)';
+                document.getElementById('editAgentBtn').style.borderColor = '#ef4444';
+                document.getElementById('editAgentBtn').style.color = '#ef4444';
+            } else {
+                cancelEditAgent();
+            }
+        }
+        
+        function cancelEditAgent() {
+            document.getElementById('agentEditPanel').style.display = 'none';
+            document.getElementById('editAgentBtn').textContent = '✏️ 编辑';
+            document.getElementById('editAgentBtn').style.background = 'rgba(251,191,36,0.2)';
+            document.getElementById('editAgentBtn').style.borderColor = '#fbbf24';
+            document.getElementById('editAgentBtn').style.color = '#fbbf24';
+        }
+        
+        async function saveAgentConfig() {
+            if (!currentAgentId) return;
+            
+            const name = document.getElementById('editAgentName').value.trim();
+            const desc = document.getElementById('editAgentDesc').value.trim();
+            const skillsStr = document.getElementById('editAgentSkills').value.trim();
+            const prompt = document.getElementById('editAgentPrompt').value.trim();
+            
+            const skills = skillsStr ? skillsStr.split(',').map(s => s.trim()).filter(Boolean) : [];
+            
+            try {
+                const resp = await fetch(API_BASE + '/api/agents/' + currentAgentId, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        name: name,
+                        description: desc,
+                        skills: skills,
+                        system_prompt: prompt
+                    })
+                });
+                const data = await resp.json();
+                
+                if (data.status === 'ok') {
+                    alert('✅ 配置已保存！');
+                    cancelEditAgent();
+                    showAgentDetail(currentAgentId);
+                    loadAgents();
+                } else {
+                    alert('❌ 保存失败: ' + (data.detail || JSON.stringify(data)));
+                }
+            } catch (e) {
+                alert('❌ 保存失败: ' + e.message);
+            }
+        }
+        
+        // ============== 代理记忆系统 ==============
+        
+        async function loadAgentMemoryList() {
+            if (!currentAgentId) return;
+            
+            const list = document.getElementById('agentMemoryList');
+            try {
+                const resp = await fetch(API_BASE + '/api/agents/' + currentAgentId + '/memory');
+                const data = await resp.json();
+                const memories = data.memories || {};
+                const memoryList = Object.values(memories);
+                
+                if (memoryList.length === 0) {
+                    list.innerHTML = '<div style="color:#666;text-align:center;padding:10px;">暂无记忆</div>';
+                    return;
+                }
+                
+                list.innerHTML = memoryList.map(m => 
+                    '<div style="padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:start;">' +
+                    '<div><div style="font-weight:bold;font-size:12px;color:#fff;">' + (m.title || '无标题') + '</div>' +
+                    '<div style="font-size:11px;color:#a0aec0;margin-top:3px;">' + (m.content || '').substring(0, 60) + '</div></div>' +
+                    '<button onclick="deleteAgentMemory(\'' + m.id + '\')" style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:12px;">🗑</button>' +
                     '</div>'
                 ).join('');
             } catch (e) {
@@ -1268,93 +2001,61 @@ let currentEditingFile = null;
             }
         }
         
-        async function loadAgentTasks(agentId) {
-            const list = document.getElementById('agentTasksList');
+        async function addAgentMemory() {
+            if (!currentAgentId) {
+                alert('请先选择代理');
+                return;
+            }
+            
+            const title = prompt('记忆标题:');
+            if (!title) return;
+            
+            const content = prompt('记忆内容:');
+            
             try {
-                const resp = await fetch(API_BASE + '/agents/' + agentId + '/tasks');
+                const resp = await fetch(API_BASE + '/api/agents/' + currentAgentId + '/memory', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({title, content: content || ''})
+                });
                 const data = await resp.json();
-                const tasks = data.tasks || [];
                 
-                if (tasks.length === 0) {
-                    list.innerHTML = '<div style="color:#666;padding:10px;">暂无历史任务</div>';
-                    return;
+                if (data.status === 'ok') {
+                    loadAgentMemoryList();
+                } else {
+                    alert('添加失败');
                 }
-                
-                list.innerHTML = tasks.slice(-10).reverse().map(t => {
-                    const statusColor = t.status === 'completed' ? '#4ade80' : t.status === 'failed' ? '#ef4444' : '#f59e0b';
-                    return '<div style="padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;">' +
-                        '<div style="font-size:12px;">' + t.task + '</div>' +
-                        '<div style="font-size:11px;color:' + statusColor + ';">' + t.status + '</div>' +
-                        '</div>';
-                }).join('');
             } catch (e) {
-                list.innerHTML = '<div style="color:#666;padding:10px;">加载失败</div>';
+                alert('添加失败: ' + e.message);
             }
         }
         
-        function addAgentMemory() {
-            if (!currentAgentId) return;
-            const title = prompt('记忆标题:');
-            if (!title) return;
-            const content = prompt('记忆内容:');
+        async function deleteAgentMemory(memoryId) {
+            if (!confirm('删除此记忆？')) return;
             
-            fetch(API_BASE + '/agents/' + currentAgentId + '/memory', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({title, content: content || ''})
-            }).then(() => {
-                alert('✅ 记忆添加成功！');
-                loadAgentMemories(currentAgentId);
-            });
-        }
-        
-        function refreshAgentTasks() {
-            if (currentAgentId) loadAgentTasks(currentAgentId);
-        }
-        
-        async function saveAgent() {
-            if (!currentAgentId) return;
-            const desc = document.getElementById('agentDetailDesc').value;
-            const status = document.getElementById('agentDetailStatus').value;
-            
-            try {
-                await fetch(API_BASE + '/agents/' + currentAgentId, {
-                    method: 'PUT',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({description: desc, status: status})
-                });
-                alert('✅ 保存成功！');
-                closeAgentDetail();
-                loadAgents();
-            } catch (e) { alert('保存失败: ' + e.message); }
-        }
-        
-        async function deleteAgent() {
-            if (!currentAgentId) return;
-            if (!confirm('确定要删除这个子代理吗？')) return;
-            
-            try {
-                await fetch(API_BASE + '/agents/' + currentAgentId, { method: 'DELETE' });
-                closeAgentDetail();
-                loadAgents();
-            } catch (e) { alert('删除失败: ' + e.message); }
-        }
-        
-        function closeAgentDetail() {
-            document.getElementById('agentDetailModal').classList.remove('show');
-            currentAgentId = null;
+            // 从后端删除（需要添加 API）
+            loadAgentMemoryList();
         }
         
         // 记忆
         async function loadMemories() {
             try {
+                // 调用 /memory 端点获取记忆列表（不是 /api/memory 统计信息）
                 const resp = await fetch(API_BASE + '/memory');
                 const data = await resp.json();
                 const list = document.getElementById('memoryList');
-                list.innerHTML = data.memories.map(m => '<div class="memory-item" onclick="editMemory(\'' + (m.id || '') + '\')"><div class="memory-title">' + (m.title || m.content?.split('\n')[0] || '无标题') + '</div><div class="memory-content">' + (m.content?.split('\n')[1] || m.content || '') + '</div><div class="memory-tags">' + ((m.tags || []).map(t => '<span class="memory-tag">' + t + '</span>').join('')) + '</div></div>').join('') || '<div style="color:#666;padding:20px;">暂无记忆 <br><br><button onclick="showAddMemory()" style="background:rgba(102,126,234,0.3);border:none;color:#667eea;padding:8px 16px;border-radius:6px;cursor:pointer;">+ 添加记忆</button></div>';
+                
+                const memories = data.memories || [];
+                
+                if (memories.length === 0) {
+                    list.innerHTML = '<div style="color:#666;padding:20px;">暂无记忆 <br><br><button onclick="showAddMemory()" style="background:rgba(102,126,234,0.3);border:none;color:#667eea;padding:8px 16px;border-radius:6px;cursor:pointer;">+ 添加记忆</button></div>';
+                    return;
+                }
+                
+                list.innerHTML = memories.map(m => '<div class="memory-item" onclick="editMemory(\'' + (m.id || '') + '\')"><div class="memory-title">' + (m.title || m.content?.split('\n')[0] || '无标题') + '</div><div class="memory-content">' + (m.content?.split('\n')[1] || m.content || '') + '</div><div class="memory-tags">' + ((m.tags || []).map(t => '<span class="memory-tag">' + t + '</span>').join('')) + '</div></div>').join('');
             } catch (e) { 
                 console.error(e); 
-                document.getElementById('memoryList').innerHTML = '<div style="color:#ef4444;padding:20px;">无法加载记忆，请检查后端服务</div>';
+                document.getElementById('memoryList').innerHTML = '<div style="color:#ef4444;padding:20px;">无法加载记忆，请检查后端服务<br><small>' + e.message + '</small></div>';
             }
         }
         
@@ -1369,6 +2070,7 @@ let currentEditingFile = null;
             const tags = prompt('标签 (逗号分隔):');
             const tagsArray = tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : [];
             
+            // 使用 /memory 端点
             fetch(API_BASE + '/memory', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -1399,7 +2101,7 @@ let currentEditingFile = null;
                 const tagsInput = prompt('标签 (逗号分隔):');
                 const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(Boolean) : [];
                 
-                // 使用 PUT 更新
+                // 使用 PUT 更新 - 使用 /memory 端点
                 fetch(API_BASE + '/memory/' + id, {
                     method: 'PUT',
                     headers: {'Content-Type': 'application/json'},
@@ -1424,7 +2126,7 @@ let currentEditingFile = null;
                     alert('编辑失败: ' + e.message);
                 });
             } else {
-                // 删除
+                // 删除 - 使用 /memory 端点
                 if (!confirm('确定要删除这条记忆吗？')) return;
                 fetch(API_BASE + '/memory/' + id, { method: 'DELETE' })
                     .then(resp => resp.json())
@@ -1520,7 +2222,7 @@ let currentEditingFile = null;
                 const data = await resp.json();
                 
                 // 激活模型
-                await fetch(API_BASE + '/models/' + provider + '/activate', {
+                await fetch(API_BASE + '/api/models/' + provider + '/activate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
@@ -1534,6 +2236,164 @@ let currentEditingFile = null;
                 loadSettings(); // 刷新
             } catch (e) {
                 alert('⚠️ 保存失败: ' + e.message);
+            }
+        }
+        
+        // ============== 子代理 API 配置 ==============
+        
+        // 加载代理列表到选择框
+        async function loadAgentApiConfigs() {
+            try {
+                // 加载代理列表
+                const resp = await fetch(API_BASE + '/api/agents');
+                const data = await resp.json();
+                const agents = data.agents || [];
+                
+                // 填充选择框
+                const select = document.getElementById('agentApiSelect');
+                select.innerHTML = '<option value="">-- 选择代理 --</option>' +
+                    agents.map(a => `<option value="${a.id}">${a.icon || '🤖'} ${a.name} (${a.role || 'worker'})</option>`).join('');
+                
+                // 加载已保存的代理配置
+                const configResp = await fetch(API_BASE + '/api/agent-api-configs');
+                const configData = await configResp.json();
+                const configs = configData.configs || {};
+                
+                // 渲染配置列表
+                const listDiv = document.getElementById('agentApiList');
+                if (Object.keys(configs).length === 0) {
+                    listDiv.innerHTML = '<div style="color:#666;text-align:center;padding:20px;">暂无代理专属配置，所有代理使用全局配置</div>';
+                } else {
+                    listDiv.innerHTML = Object.entries(configs).map(([agentId, cfg]) => {
+                        const agent = agents.find(a => a.id === agentId) || {name: '未知代理', icon: '🤖'};
+                        return `<div style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <span style="font-size:18px;">${agent.icon}</span>
+                                <span style="font-weight:bold;margin-left:8px;">${agent.name}</span>
+                                <span style="font-size:12px;color:#a0aec0;margin-left:10px;">${cfg.model || '默认模型'}</span>
+                            </div>
+                            <div style="display:flex;gap:8px;">
+                                <button onclick="editAgentApiConfig('${agentId}')" style="background:rgba(102,126,234,0.3);border:none;color:#667eea;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;">编辑</button>
+                                <button onclick="deleteAgentApiConfig('${agentId}')" style="background:rgba(239,68,68,0.2);border:none;color:#ef4444;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:11px;">删除</button>
+                            </div>
+                        </div>`;
+                    }).join('');
+                }
+            } catch (e) {
+                console.error('加载代理配置失败:', e);
+                document.getElementById('agentApiList').innerHTML = '<div style="color:#ef4444;text-align:center;padding:20px;">加载失败: ' + e.message + '</div>';
+            }
+        }
+        
+        // 加载单个代理的配置
+        async function loadAgentApiConfig() {
+            const agentId = document.getElementById('agentApiSelect').value;
+            const panel = document.getElementById('agentApiConfigPanel');
+            
+            if (!agentId) {
+                panel.style.display = 'none';
+                return;
+            }
+            
+            panel.style.display = 'block';
+            
+            try {
+                // 获取代理信息
+                const agentResp = await fetch(API_BASE + '/api/agents/' + agentId);
+                const agentData = await agentResp.json();
+                const agent = agentData.agent || agentData;
+                
+                document.getElementById('selectedAgentIcon').textContent = agent.icon || '🤖';
+                document.getElementById('selectedAgentName').textContent = agent.name || '未知代理';
+                document.getElementById('selectedAgentRole').textContent = agent.role || 'worker';
+                
+                // 获取代理配置
+                const configResp = await fetch(API_BASE + '/api/agent-api-configs/' + agentId);
+                const configData = await configResp.json();
+                const config = configData.config || {};
+                
+                if (config.use_global !== false) {
+                    // 使用全局配置
+                    document.getElementById('agentUseGlobalApi').checked = true;
+                    document.getElementById('agentApiFields').style.display = 'none';
+                } else {
+                    // 使用独立配置
+                    document.getElementById('agentUseGlobalApi').checked = false;
+                    document.getElementById('agentApiFields').style.display = 'block';
+                    document.getElementById('agentApiUrl').value = config.api_url || '';
+                    document.getElementById('agentApiKey').value = config.api_key || '';
+                    document.getElementById('agentModelName').value = config.model || '';
+                }
+            } catch (e) {
+                console.error('加载代理配置失败:', e);
+            }
+        }
+        
+        // 切换代理API字段显示
+        function toggleAgentApiFields() {
+            const useGlobal = document.getElementById('agentUseGlobalApi').checked;
+            document.getElementById('agentApiFields').style.display = useGlobal ? 'none' : 'block';
+        }
+        
+        // 保存代理API配置
+        async function saveAgentApiConfig() {
+            const agentId = document.getElementById('agentApiSelect').value;
+            if (!agentId) {
+                alert('请先选择代理');
+                return;
+            }
+            
+            const useGlobal = document.getElementById('agentUseGlobalApi').checked;
+            const config = {
+                use_global: useGlobal,
+                api_url: useGlobal ? '' : document.getElementById('agentApiUrl').value,
+                api_key: useGlobal ? '' : document.getElementById('agentApiKey').value,
+                model: useGlobal ? '' : document.getElementById('agentModelName').value
+            };
+            
+            try {
+                const resp = await fetch(API_BASE + '/api/agent-api-configs/' + agentId, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(config)
+                });
+                const data = await resp.json();
+                
+                if (data.success || data.status === 'ok') {
+                    alert('✅ 代理配置已保存！');
+                    loadAgentApiConfigs();
+                } else {
+                    alert('保存失败: ' + (data.error || JSON.stringify(data)));
+                }
+            } catch (e) {
+                alert('保存失败: ' + e.message);
+            }
+        }
+        
+        // 编辑代理配置
+        function editAgentApiConfig(agentId) {
+            document.getElementById('agentApiSelect').value = agentId;
+            loadAgentApiConfig();
+        }
+        
+        // 删除代理配置
+        async function deleteAgentApiConfig(agentId) {
+            if (!confirm('确定删除此代理的专属配置？删除后将使用全局配置。')) return;
+            
+            try {
+                const resp = await fetch(API_BASE + '/api/agent-api-configs/' + agentId, {
+                    method: 'DELETE'
+                });
+                const data = await resp.json();
+                
+                if (data.success || data.status === 'ok') {
+                    alert('✅ 已删除');
+                    loadAgentApiConfigs();
+                    document.getElementById('agentApiSelect').value = '';
+                    document.getElementById('agentApiConfigPanel').style.display = 'none';
+                }
+            } catch (e) {
+                alert('删除失败: ' + e.message);
             }
         }
         
@@ -1596,7 +2456,7 @@ let currentEditingFile = null;
         
         async function loadSkills() {
             try {
-                const resp = await fetch(API_BASE + '/skills');
+                const resp = await fetch(API_BASE + '/api/skills');
                 const data = await resp.json();
                 const skills = data.skills || [];
                 const grid = document.getElementById('skillsGrid');
@@ -1638,9 +2498,9 @@ let currentEditingFile = null;
                 // 并发拉取状态
                 const [healthResp, configResp, modelsResp, tasksResp, monitorResp, logsResp] = await Promise.all([
                     fetch(apiBase + '/health'),
-                    fetch(apiBase + '/config'),
-                    fetch(apiBase + '/models'),
-                    fetch(apiBase + '/bg-tasks'),
+                    fetch(apiBase + '/api/config'),
+                    fetch(apiBase + '/api/models'),
+                    fetch(apiBase + '/api/bg-tasks'),
                     fetch(apiBase + '/api/monitor'),
                     fetch(apiBase + '/api/logs?lines=80')
                 ]);
@@ -1835,43 +2695,17 @@ function showCreateProjectModal() {
     document.getElementById('addProjectModal').classList.add('show');
 }
 
-// 确认创建项目
-async function confirmAddProject() {
-    const name = document.getElementById('newProjectName').value.trim();
-    const desc = document.getElementById('newProjectDesc').value.trim();
-    
-    if (!name) {
-        alert('请输入项目名称');
-        return;
-    }
-    
-    try {
-        const resp = await fetch(API_BASE + '/api/projects', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, description: desc, icon: '📁' })
-        });
-        const data = await resp.json();
-        
-        if (data.success) {
-            closeModal();
-            loadProjects();
-            alert('项目创建成功！');
-        } else {
-            alert('创建失败: ' + (data.detail || JSON.stringify(data)));
-        }
-    } catch (e) {
-        alert('创建失败: ' + e.message);
-    }
-}
-
 // 加载项目列表
 async function loadProjects() {
     const grid = document.getElementById('projectsGrid');
+    if (!grid) return;
     grid.innerHTML = '<div style="color:#666;padding:40px;text-align:center;">加载中...</div>';
     
     try {
         const resp = await fetch(API_BASE + '/api/projects');
+        if (!resp.ok) {
+            throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+        }
         const data = await resp.json();
         const projects = data.projects || [];
         
@@ -1924,6 +2758,42 @@ async function openProjectDetail(projectId) {
         
     } catch (e) {
         alert('加载项目失败: ' + e.message);
+    }
+}
+
+// 删除当前项目
+async function deleteCurrentProject() {
+    if (!currentProjectId) {
+        alert('未选择项目');
+        return;
+    }
+    
+    // 确认删除
+    if (!confirm('⚠️ 确定要删除此项目吗？\n\n此操作将：\n• 删除项目所有数据\n• 删除所有关联任务\n• 删除所有上传文档\n\n此操作不可恢复！')) {
+        return;
+    }
+    
+    // 二次确认
+    if (!confirm('🔴 最后确认：真的要删除吗？')) {
+        return;
+    }
+    
+    try {
+        const resp = await fetch(API_BASE + '/api/projects/' + currentProjectId, {
+            method: 'DELETE'
+        });
+        const data = await resp.json();
+        
+        if (data.success) {
+            alert('✅ 项目已删除');
+            currentProjectId = null;
+            switchTo('projects');
+            loadProjects();
+        } else {
+            alert('删除失败: ' + (data.detail || JSON.stringify(data)));
+        }
+    } catch (e) {
+        alert('删除失败: ' + e.message);
     }
 }
 

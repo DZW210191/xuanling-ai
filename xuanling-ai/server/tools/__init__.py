@@ -288,13 +288,18 @@ def tool_list_directory(path: str = ".") -> Dict:
 async def tool_exec_command(command: str, timeout: int = 30, cwd: str = None) -> Dict:
     """执行 Shell 命令"""
     try:
-        # 更完整的危险命令检查
+        # 更完整的危险命令检查 (增强版)
         dangerous_patterns = [
-            # 文件删除
+            # 文件删除 - 增强版
             r"rm\s+(-[rf]+\s+|.*\s+-[rf]+)",  # rm -rf 变体
             r"rm\s+.*(/\s*$|/\s+)",  # rm 删除目录
+            r"rm\s+/\*",  # 删除根目录所有文件
+            r"rm\s+\*",  # 删除当前目录所有文件
+            r"rm\s+~",  # 删除用户目录
+            r"rm\s+\$HOME",  # 删除用户目录
             r"find\s+.*-delete",  # find -delete
             r"xargs\s+rm",  # xargs rm
+            r"rmdir\s+.*-p",  # 递归删除空目录
             
             # 磁盘操作
             r"mkfs",  # 格式化
@@ -302,47 +307,78 @@ async def tool_exec_command(command: str, timeout: int = 30, cwd: str = None) ->
             r">\s*/dev/sd",  # 写入磁盘设备
             r">\s*/dev/hd",  # 写入 IDE 磁盘
             r">\s*/dev/nvme",  # 写入 NVMe
+            r">\s*/dev/loop",  # 写入 loop 设备
             
-            # 权限修改
+            # 权限修改 - 增强版
             r"chmod\s+(-R\s+)?777",  # 危险权限
             r"chmod\s+(-R\s+)?a\+rwx",  # 危险权限
+            r"chmod\s+(-R\s+)?\d{4}",  # 数字权限 (如 7777)
             r"chown\s+.*:\s*",  # 修改所有者
+            r"chgrp\s+(-R\s+)?",  # 修改组
             
             # 系统破坏
             r":\(\)\s*\{\s*:\|:&\s*\}\s*;:",  # Fork bomb
             r">\s*/dev/mem",  # 写入内存
             r">\s*/dev/port",  # 写入端口
+            r">\s*/dev/kmem",  # 写入内核内存
             
-            # 进程控制
+            # 进程控制 - 增强版
             r"kill\s+-9\s+-1",  # 杀死所有进程
             r"killall\s+",  # 杀死所有进程
             r"pkill\s+-9",  # 强制杀死进程组
+            r"kill\s+-9\s+1",  # 杀死 init 进程
             
-            # 系统控制
+            # 系统控制 - 增强版
             r"shutdown",  # 关机
             r"reboot",  # 重启
+            r"poweroff",  # 关机
+            r"halt",  # 停机
             r"init\s+[06]",  # 关机/重启
-            r"systemctl\s+(stop|disable)",  # 停止系统服务
+            r"systemctl\s+(stop|disable|reset-failed)",  # 停止系统服务
+            r"service\s+\w+\s+stop",  # 停止服务
             
-            # 远程执行
+            # 远程执行 - 增强版
             r"curl.*\|\s*(ba)?sh",  # 远程执行脚本
             r"wget.*\|\s*(ba)?sh",  # 远程执行脚本
             r"curl.*\|\s*sudo",  # 远程执行 sudo
             r"wget.*\|\s*sudo",  # 远程执行 sudo
+            r"curl.*\|\s*bash",  # curl | bash
+            r"wget.*\|\s*bash",  # wget | bash
+            r"curl.*\|\s*sh",  # curl | sh
+            r"wget.*\|\s*sh",  # wget | sh
             
-            # 系统配置
+            # 系统配置 - 增强版
             r">\s*/etc/",  # 修改系统配置
             r">\s*/boot/",  # 修改启动配置
+            r">\s*/proc/",  # 修改 proc
+            r">\s*/sys/",  # 修改 sys
             r"mv\s+.*\s+/(dev|proc|sys)",  # 移动到系统目录
+            r">\s*\$HOME/",  # 覆盖用户目录文件
+            r">\s*~/",  # 覆盖用户目录文件
             
-            # 清空文件
+            # 清空文件 - 增强版
             r">\s+/etc/passwd",  # 清空密码文件
             r">\s+/etc/shadow",  # 清空影子文件
+            r">\s+/etc/sudoers",  # 清空 sudoers
             r":>|>:",  # 清空文件
+            r">\s+/dev/null\s+2>&1\s*;",  # 可能的清空操作
             
             # 危险管道
             r"\|\s*sudo\s+rm",  # 管道到 sudo rm
             r"\|\s*xargs\s+rm",  # 管道到 xargs rm
+            r"\|\s*sh\s*$",  # 管道到 sh
+            r"\|\s*bash\s*$",  # 管道到 bash
+            
+            # 网络危险操作
+            r"iptables\s+-F",  # 清空防火墙规则
+            r"ufw\s+disable",  # 禁用防火墙
+            r"firewall-cmd\s+--reload",  # 重载防火墙
+            
+            # 其他危险操作
+            r"git\s+push\s+.*--force",  # 强制推送
+            r"git\s+reset\s+--hard\s+HEAD~",  # 强制重置
+            r"docker\s+(rm|rmi)\s+.*-f",  # 强制删除容器/镜像
+            r"kubectl\s+delete\s+.*--all",  # 删除所有资源
         ]
         
         import re

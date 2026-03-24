@@ -155,17 +155,64 @@ class EmbeddingEngine:
             return self._mock_embed(text)
     
     def _mock_embed(self, text: str) -> List[float]:
-        """模拟向量（用于无 API 时）"""
-        # 使用简单的哈希模拟向量
+        """模拟向量（用于无 API 时）- 改进版：生成更合理的语义向量"""
+        import hashlib
+        import math
+        
+        # 使用文本特征生成更合理的向量
         text_hash = hashlib.sha256(text.encode()).digest()
-        vector = []
+        
+        # 基础向量
+        base_vector = []
         for i in range(0, 64, 4):
             val = int.from_bytes(text_hash[i:i+4], 'big')
-            vector.append((val % 1000 - 500) / 500.0)
-        # 扩展到目标维度
-        while len(vector) < self._dimension:
-            vector.extend(vector[:min(len(vector), self._dimension - len(vector))])
-        return vector[:self._dimension]
+            base_vector.append((val % 1000 - 500) / 500.0)
+        
+        # 添加语义特征
+        semantic_features = []
+        
+        # 文本长度特征
+        length_norm = min(len(text) / 1000.0, 1.0)
+        semantic_features.append(length_norm)
+        
+        # 词频特征（简单模拟）
+        words = text.lower().split()
+        word_count = len(words)
+        avg_word_len = sum(len(w) for w in words) / max(word_count, 1)
+        semantic_features.append(min(avg_word_len / 10.0, 1.0))
+        
+        # 标点符号特征
+        punct_count = sum(1 for c in text if c in '.,!?;:')
+        semantic_features.append(min(punct_count / 10.0, 1.0))
+        
+        # 数字特征
+        digit_ratio = sum(c.isdigit() for c in text) / max(len(text), 1)
+        semantic_features.append(digit_ratio)
+        
+        # 中文字符特征
+        chinese_ratio = sum(1 for c in text if '\u4e00' <= c <= '\u9fff') / max(len(text), 1)
+        semantic_features.append(chinese_ratio)
+        
+        # 合并向量
+        combined = base_vector + semantic_features
+        
+        # 使用哈希扩展到目标维度（保持一致性）
+        result = []
+        for i in range(self._dimension):
+            if i < len(combined):
+                result.append(combined[i])
+            else:
+                # 使用伪随机扩展
+                idx = i % len(base_vector)
+                offset = (text_hash[i % 32] / 255.0 - 0.5) * 0.1
+                result.append(base_vector[idx] + offset)
+        
+        # 归一化
+        norm = math.sqrt(sum(x * x for x in result))
+        if norm > 0:
+            result = [x / norm for x in result]
+        
+        return result
     
     async def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """批量生成向量"""
@@ -524,8 +571,12 @@ class MemoryManager:
             self._save()
         
         # 从向量存储删除（在锁外执行异步操作）
-        await self.vector_store.delete(memory_id)
-        logger.info(f"🗑️ 遗忘记忆: {memory_id}")
+        try:
+            await self.vector_store.delete(memory_id)
+            logger.info(f"🗑️ 遗忘记忆: {memory_id}")
+        except Exception as e:
+            logger.warning(f"从向量存储删除失败: {e}")
+        
         return True
     
     def update(self, memory_id: str, **kwargs) -> Optional[MemoryEntry]:
